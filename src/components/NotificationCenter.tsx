@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { Bell, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notification } from '@/types/car';
 import { cn } from '@/lib/utils';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 interface NotificationCenterProps {
   notifications: Notification[];
@@ -11,6 +13,32 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ notifications, onClose, showHeader = true }: NotificationCenterProps) {
+  
+  // --- إضافة دالة إصدار الصوت عند وجود تنبيهات جديدة ---
+  useEffect(() => {
+    const playNotificationSound = async () => {
+      if (notifications.length > 0) {
+        // نأخذ آخر تنبيه وصل للقائمة
+        const lastNotification = notifications[0]; 
+        
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              title: lastNotification.carName,
+              body: lastNotification.message,
+              id: Date.now(),
+              channelId: 'default-channel', // نفس القناة اللي درناها في App.tsx
+              sound: 'default', // صوت الجهاز الافتراضي
+            }
+          ]
+        });
+      }
+    };
+
+    playNotificationSound();
+  }, [notifications.length]); // يشتغل الكود فقط لما يتغير عدد التنبيهات
+  // --------------------------------------------------
+
   const getSeverityIcon = (severity: Notification['severity']) => {
     switch (severity) {
       case 'danger':

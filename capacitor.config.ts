@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.carmanager.ly',
-  appName: 'Car Manager',
+  appId: 'com.obada.garage.app',
+  appName: 'Garage',
   webDir: 'dist'
 };
 
