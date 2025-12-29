@@ -28,15 +28,21 @@ export function useCars() {
     }
   }, [cars, isLoaded]);
 
-  const addCar = useCallback((car: Omit<Car, 'id' | 'legalDocs' | 'oilServices' | 'brakeTireServices' | 'settings' | 'lastMileageUpdate'>) => {
+  const addCar = useCallback((car: Omit<Car, 'id' | 'legalDocs' | 'oilServices' | 'brakeTireServices' | 'settings' | 'lastMileageUpdate' | 'mileageHistory'>) => {
+    const now = new Date().toISOString();
     const newCar: Car = {
       ...car,
       id: crypto.randomUUID(),
       legalDocs: [],
       oilServices: [],
       brakeTireServices: [],
+      mileageHistory: [{
+        id: crypto.randomUUID(),
+        mileage: car.currentMileage,
+        date: now,
+      }],
       settings: { ...defaultCarSettings },
-      lastMileageUpdate: new Date().toISOString(),
+      lastMileageUpdate: now,
     };
     setCars(prev => [...prev, newCar]);
     return newCar;
@@ -89,11 +95,21 @@ export function useCars() {
   }, []);
 
   const updateMileage = useCallback((carId: string, mileage: number) => {
-    setCars(prev => prev.map(car => 
-      car.id === carId 
-        ? { ...car, currentMileage: mileage, lastMileageUpdate: new Date().toISOString() }
-        : car
-    ));
+    const now = new Date().toISOString();
+    setCars(prev => prev.map(car => {
+      if (car.id !== carId) return car;
+      const newRecord = {
+        id: crypto.randomUUID(),
+        mileage,
+        date: now,
+      };
+      return {
+        ...car,
+        currentMileage: mileage,
+        lastMileageUpdate: now,
+        mileageHistory: [...(car.mileageHistory || []), newRecord],
+      };
+    }));
   }, []);
 
   const updateCarSettings = useCallback((carId: string, settings: Partial<Car['settings']>) => {

@@ -21,6 +21,12 @@ export interface BrakeTireService {
   notes?: string;
 }
 
+export interface MileageRecord {
+  id: string;
+  mileage: number;
+  date: string;
+}
+
 export interface Car {
   id: string;
   make: string;
@@ -28,6 +34,7 @@ export interface Car {
   year: number;
   currentMileage: number;
   lastMileageUpdate: string;
+  mileageHistory: MileageRecord[];
   legalDocs: LegalDocument[];
   oilServices: OilService[];
   brakeTireServices: BrakeTireService[];
