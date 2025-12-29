@@ -1,4 +1,4 @@
-package com.carmanager.ly;
+package com.obada.garage.app;
 
 import com.getcapacitor.BridgeActivity;
 
