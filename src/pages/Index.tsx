@@ -10,6 +10,7 @@ import { LegalVault } from '@/components/LegalVault';
 import { OilService } from '@/components/OilService';
 import { BrakesTires } from '@/components/BrakesTires';
 import { MileagePrompt } from '@/components/MileagePrompt';
+import { MileageEditor } from '@/components/MileageEditor';
 import { useCars, useNotifications, shouldShowMileagePrompt, markMileagePromptShown } from '@/hooks/useCars';
 import { Car as CarType } from '@/types/car';
 import { cn } from '@/lib/utils';
@@ -147,10 +148,17 @@ const Index = () => {
                   <Trash2 className="w-5 h-5" />
                 </Button>
               </div>
-              <div className="mt-4 flex items-center gap-2 text-lg">
-                <Gauge className="w-5 h-5 text-primary" />
-                <span className="font-bold">{car.currentMileage.toLocaleString()}</span>
-                <span className="text-muted-foreground">كم</span>
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-lg">
+                  <Gauge className="w-5 h-5 text-primary" />
+                  <span className="font-bold">{car.currentMileage.toLocaleString()}</span>
+                  <span className="text-muted-foreground">كم</span>
+                </div>
+                <MileageEditor
+                  currentMileage={car.currentMileage}
+                  mileageHistory={car.mileageHistory || []}
+                  onUpdate={(mileage) => updateMileage(car.id, mileage)}
+                />
               </div>
             </CardContent>
           </Card>

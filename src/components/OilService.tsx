@@ -18,6 +18,13 @@ interface OilServiceProps {
   onUpdateSettings: (settings: Partial<CarSettings>) => void;
 }
 
+// Get unique suggestions from previous services
+function getUniqueSuggestions(services: OilServiceType[]) {
+  const stations = [...new Set(services.map(s => s.stationName))];
+  const brands = [...new Set(services.map(s => s.oilBrand))];
+  return { stations, brands };
+}
+
 export function OilService({ services, currentMileage, settings, onAdd, onUpdateSettings }: OilServiceProps) {
   const [open, setOpen] = useState(false);
   const [stationName, setStationName] = useState('');
@@ -28,6 +35,16 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
 
   const latestService = services[services.length - 1];
   const previousServices = services.slice(0, -1).reverse();
+  const suggestions = getUniqueSuggestions(services);
+
+  // Pre-fill with last used values when opening dialog
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen && latestService) {
+      setStationName(latestService.stationName);
+      setOilBrand(latestService.oilBrand);
+    }
+    setOpen(isOpen);
+  };
 
   const getServiceStatus = () => {
     if (!latestService) return null;
@@ -80,7 +97,7 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
           <Droplets className="w-5 h-5 text-primary" />
           خدمة الزيت
         </CardTitle>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button variant="goldOutline" size="sm">
               <Plus className="w-4 h-4" />
@@ -107,8 +124,16 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                         placeholder="مثال: محطة الوحدة..."
                         value={stationName}
                         onChange={(e) => setStationName(e.target.value)}
+                        list="station-suggestions"
                         required
                       />
+                      {suggestions.stations.length > 0 && (
+                        <datalist id="station-suggestions">
+                          {suggestions.stations.map((s, i) => (
+                            <option key={i} value={s} />
+                          ))}
+                        </datalist>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -117,8 +142,16 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                       placeholder="مثال: موبيل 1، كاسترول..."
                       value={oilBrand}
                       onChange={(e) => setOilBrand(e.target.value)}
+                      list="brand-suggestions"
                       required
                     />
+                    {suggestions.brands.length > 0 && (
+                      <datalist id="brand-suggestions">
+                        {suggestions.brands.map((b, i) => (
+                          <option key={i} value={b} />
+                        ))}
+                      </datalist>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
