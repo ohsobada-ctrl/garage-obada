@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Car Manager</string>
+    <string name="title_activity_main">Car Manager</string>
+    <string name="package_name">com.carmanager.ly</string>
+    <string name="custom_url_scheme">com.carmanager.ly</string>
+</resources>
