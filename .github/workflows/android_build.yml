@@ -1,13 +1,19 @@
 name: Build Android APK
 on:
   push:
-    branches: [ main ] # حيبدأ يخدم أول ما تدير Push للـ Main
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # هذا السطر هو الحل: تحديد نسخة Node 22
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
