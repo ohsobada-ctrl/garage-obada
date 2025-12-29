@@ -39,4 +39,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Car-Manager1-App
-          path: android/app/build/outputs/apk/debug/app-debug1.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
