@@ -183,6 +183,24 @@ const Index = () => {
             onAdd={(service) => addBrakeTireService(car.id, service)}
             onUpdateSettings={(settings) => updateCarSettings(car.id, settings)}
           />
+          {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف السيارة</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟ 
+              سيتم حذف جميع البيانات والسجلات المرتبطة بها.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
         </main>
       </div>
     );
@@ -280,24 +298,7 @@ const Index = () => {
         onUpdate={updateMileage}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>حذف السيارة</AlertDialogTitle>
-            <AlertDialogDescription>
-              هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟ 
-              سيتم حذف جميع البيانات والسجلات المرتبطة بها.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              حذف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      
     </div>
   );
 };
