@@ -183,29 +183,33 @@ const Index = () => {
             onAdd={(service) => addBrakeTireService(car.id, service)}
             onUpdateSettings={(settings) => updateCarSettings(car.id, settings)}
           />
-          {/* Delete Confirmation Dialog */}
+                  {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>حذف السيارة</AlertDialogTitle>
-            <AlertDialogDescription>
-              هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟ 
-              سيتم حذف جميع البيانات والسجلات المرتبطة بها.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              حذف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+  <AlertDialogContent className="fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 font-tajawal text-right">
+    <AlertDialogHeader>
+      <AlertDialogTitle className="text-xl font-bold">حذف السيارة</AlertDialogTitle>
+      <AlertDialogDescription className="text-base pt-2 text-muted-foreground">
+        هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟ 
+        سيتم حذف جميع البيانات والسجلات المرتبطة بها نهائياً.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter className="flex flex-row-reverse gap-3 mt-6">
+      <AlertDialogAction 
+        onClick={confirmDelete} 
+        className="bg-red-600 text-white hover:bg-red-700 flex-1 py-6 text-lg font-bold"
+      >
+        نعم، احذف السيارة
+      </AlertDialogAction>
+      <AlertDialogCancel className="flex-1 mt-0 py-6 text-lg">
+        إلغاء
+      </AlertDialogCancel>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
         </main>
       </div>
     );
   }
-
   // Garage View
   return (
     <div className="min-h-screen pb-8">
