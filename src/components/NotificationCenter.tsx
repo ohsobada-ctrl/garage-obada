@@ -8,19 +8,27 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 // صوت تنبيه بسيط باستخدام Web Audio API
+let audioCtx: AudioContext | null = null;
+
 function playBeepSound() {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    // استئناف السياق إذا كان معلقاً (سياسة المتصفح)
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
     oscillator.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(audioCtx.destination);
     oscillator.frequency.value = 880;
     oscillator.type = 'sine';
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.5);
   } catch (e) {
     console.warn('تعذر تشغيل صوت التنبيه:', e);
   }
@@ -34,15 +42,14 @@ interface NotificationCenterProps {
 
 export function NotificationCenter({ notifications, onClose, showHeader = true }: NotificationCenterProps) {
   
-  const prevCountRef = useRef(notifications.length);
+  const hasSoundPlayed = useRef(false);
 
   useEffect(() => {
-    // يشتغل فقط لما يزيد عدد التنبيهات (تنبيه جديد)
-    if (notifications.length > 0 && notifications.length !== prevCountRef.current) {
+    if (notifications.length > 0 && !hasSoundPlayed.current) {
+      hasSoundPlayed.current = true;
       const lastNotification = notifications[0];
 
       if (Capacitor.isNativePlatform()) {
-        // على الجهاز: إشعار نظام حقيقي
         LocalNotifications.schedule({
           notifications: [{
             title: lastNotification.carName,
@@ -53,11 +60,18 @@ export function NotificationCenter({ notifications, onClose, showHeader = true }
           }]
         }).catch(console.error);
       } else {
-        // في المتصفح: صوت بيب
+        // تشغيل الصوت بعد أي تفاعل من المستخدم
+        const triggerSound = () => {
+          playBeepSound();
+          document.removeEventListener('click', triggerSound);
+          document.removeEventListener('touchstart', triggerSound);
+        };
+        // جرب تشغيله مباشرة، وإذا ما اشتغل ننتظر تفاعل
         playBeepSound();
+        document.addEventListener('click', triggerSound, { once: true });
+        document.addEventListener('touchstart', triggerSound, { once: true });
       }
     }
-    prevCountRef.current = notifications.length;
   }, [notifications.length]);
 
   const getSeverityIcon = (severity: Notification['severity']) => {
