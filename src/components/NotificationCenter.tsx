@@ -1,10 +1,30 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Bell, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notification } from '@/types/car';
 import { cn } from '@/lib/utils';
+import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+
+// صوت تنبيه بسيط باستخدام Web Audio API
+function playBeepSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.frequency.value = 880;
+    oscillator.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.5);
+  } catch (e) {
+    console.warn('تعذر تشغيل صوت التنبيه:', e);
+  }
+}
 
 interface NotificationCenterProps {
   notifications: Notification[];
@@ -14,30 +34,31 @@ interface NotificationCenterProps {
 
 export function NotificationCenter({ notifications, onClose, showHeader = true }: NotificationCenterProps) {
   
-  // --- إضافة دالة إصدار الصوت عند وجود تنبيهات جديدة ---
-  useEffect(() => {
-    const playNotificationSound = async () => {
-      if (notifications.length > 0) {
-        // نأخذ آخر تنبيه وصل للقائمة
-        const lastNotification = notifications[0]; 
-        
-        await LocalNotifications.schedule({
-          notifications: [
-            {
-              title: lastNotification.carName,
-              body: lastNotification.message,
-              id: Date.now(),
-              channelId: 'default-channel', // نفس القناة اللي درناها في App.tsx
-              sound: 'default', // صوت الجهاز الافتراضي
-            }
-          ]
-        });
-      }
-    };
+  const prevCountRef = useRef(notifications.length);
 
-    playNotificationSound();
-  }, [notifications.length]); // يشتغل الكود فقط لما يتغير عدد التنبيهات
-  // --------------------------------------------------
+  useEffect(() => {
+    // يشتغل فقط لما يزيد عدد التنبيهات (تنبيه جديد)
+    if (notifications.length > 0 && notifications.length !== prevCountRef.current) {
+      const lastNotification = notifications[0];
+
+      if (Capacitor.isNativePlatform()) {
+        // على الجهاز: إشعار نظام حقيقي
+        LocalNotifications.schedule({
+          notifications: [{
+            title: lastNotification.carName,
+            body: lastNotification.message,
+            id: Date.now(),
+            channelId: 'default-channel',
+            sound: 'default',
+          }]
+        }).catch(console.error);
+      } else {
+        // في المتصفح: صوت بيب
+        playBeepSound();
+      }
+    }
+    prevCountRef.current = notifications.length;
+  }, [notifications.length]);
 
   const getSeverityIcon = (severity: Notification['severity']) => {
     switch (severity) {
