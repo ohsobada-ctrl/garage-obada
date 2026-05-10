@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { AddCarDialog } from '@/components/AddCarDialog';
+import { ProfileDialog } from '@/components/ProfileDialog';
 import { CarCard } from '@/components/CarCard';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { LegalVault } from '@/components/LegalVault';
@@ -231,10 +232,7 @@ const Index = () => {
               <Button variant="ghost" size="icon" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive">
                 <LogOut className="w-5 h-5" />
               </Button>
-              <div className="text-right hidden sm:block">
-                <p className="text-xs text-muted-foreground">مرحباً بك</p>
-                <p className="text-sm font-bold">{user?.email?.split('@')[0] || 'مستخدم'}</p>
-              </div>
+              <ProfileDialog />
               <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="relative">
