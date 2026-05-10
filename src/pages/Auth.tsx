@@ -21,10 +21,12 @@ const Auth = () => {
 
   useEffect(() => {
     // Check if Supabase keys are placeholders
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || url.includes("your-project") || !key || key.includes("your-anon-key")) {
+    const url = import.meta.env.VITE_SUPABASE_URL || import.meta.env.LOVABLE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.LOVABLE_SUPABASE_ANON_KEY;
+    if (!url || url.includes("your-project") || url.includes("placeholder") || !key || key.includes("your-anon-key")) {
       setIsConfigMissing(true);
+    } else {
+      setIsConfigMissing(false);
     }
   }, []);
 
