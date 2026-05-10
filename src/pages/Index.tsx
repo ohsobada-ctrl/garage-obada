@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Car, Bell, Plus, ChevronLeft, Gauge, Trash2 } from 'lucide-react';
+import { Car, Bell, Plus, ChevronLeft, Gauge, Trash2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -11,9 +11,12 @@ import { OilService } from '@/components/OilService';
 import { BrakesTires } from '@/components/BrakesTires';
 import { MileagePrompt } from '@/components/MileagePrompt';
 import { MileageEditor } from '@/components/MileageEditor';
-import { useCars, useNotifications, shouldShowMileagePrompt, markMileagePromptShown } from '@/hooks/useCars';
+import { useCarsSupabase } from '@/hooks/useCarsSupabase';
+import { useNotifications, shouldShowMileagePrompt, markMileagePromptShown } from '@/hooks/useCars';
+import { useAuth } from '@/lib/auth';
 import { Car as CarType } from '@/types/car';
 import { cn } from '@/lib/utils';
+import { LogOut } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const Index = () => {
+  const { user, signOut } = useAuth();
   const { 
     cars, 
     isLoaded, 
@@ -36,7 +40,7 @@ const Index = () => {
     addBrakeTireService,
     updateMileage,
     updateCarSettings,
-  } = useCars();
+  } = useCarsSupabase();
   
   const notifications = useNotifications(cars);
   const [selectedCar, setSelectedCar] = useState<CarType | null>(null);
@@ -223,7 +227,15 @@ const Index = () => {
               </div>
               <h1 className="text-xl font-bold">المرآب</h1>
             </div>
-            <Sheet>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive">
+                <LogOut className="w-5 h-5" />
+              </Button>
+              <div className="text-right hidden sm:block">
+                <p className="text-xs text-muted-foreground">مرحباً بك</p>
+                <p className="text-sm font-bold">{user?.email?.split('@')[0] || 'مستخدم'}</p>
+              </div>
+              <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="relative">
                   <Bell className="w-4 h-4" />
@@ -248,13 +260,46 @@ const Index = () => {
       </header>
 
       <main className="container pt-6">
+        {cars.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            <Card className="bg-primary/5 border-primary/10">
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <Car className="w-5 h-5 text-primary mb-1" />
+                <p className="text-xl font-bold">{cars.length}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">السيارات</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-destructive/5 border-destructive/10">
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <Bell className="w-5 h-5 text-destructive mb-1" />
+                <p className="text-xl font-bold">{notifications.length}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">تنبيهات</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-secondary/50 border-border/40">
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <Gauge className="w-5 h-5 text-secondary-foreground mb-1" />
+                <p className="text-xl font-bold">{(cars.reduce((acc, c) => acc + c.currentMileage, 0) / 1000).toFixed(1)}k</p>
+                <p className="text-[10px] text-muted-foreground uppercase">إجمالي المسافة</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-primary/5 border-primary/10">
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <ShieldCheck className="w-5 h-5 text-primary mb-1" />
+                <p className="text-xl font-bold">{cars.reduce((acc, c) => acc + c.legalDocs.length, 0)}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">وثائق</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {cars.length === 0 ? (
           // Empty State
-          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
             <div className="w-24 h-24 rounded-2xl gradient-gold flex items-center justify-center mb-6 animate-float gold-glow">
               <Car className="w-12 h-12 text-primary-foreground" />
             </div>
-            <h2 className="text-2xl font-bold mb-2">مرحباً بك في المرآب!</h2>
+            <h2 className="text-2xl font-bold mb-2 font-tajawal">مرحباً بك في المرآب!</h2>
             <p className="text-muted-foreground mb-6 max-w-sm">
               أضف سيارتك الأولى وخليها تحت عينك دايماً. نذكرك بكل شي من التأمين للزيت!
             </p>
