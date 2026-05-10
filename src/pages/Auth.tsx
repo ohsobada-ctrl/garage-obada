@@ -33,6 +33,13 @@ const Auth = () => {
     }
   }, []);
 
+  const formatPhone = (p: string) => {
+    let cleaned = p.replace(/\s+/g, '').replace(/-/g, '');
+    if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+    if (!cleaned.startsWith('+')) cleaned = '+218' + cleaned;
+    return cleaned;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginIdentifier || !password) return toast.error("يرجى إدخال البيانات");
@@ -40,16 +47,18 @@ const Auth = () => {
     setLoading(true);
     try {
       const isEmail = loginIdentifier.includes("@");
+      const formattedId = isEmail ? loginIdentifier : formatPhone(loginIdentifier);
+      
       const loginParams = isEmail 
-        ? { email: loginIdentifier, password }
-        : { phone: loginIdentifier, password };
+        ? { email: formattedId, password }
+        : { phone: formattedId, password };
 
       const { data, error } = await supabase.auth.signInWithPassword(loginParams);
       
       if (error) {
         // If error is related to unconfirmed phone, we might need to send OTP
         if (error.message.includes("confirm")) {
-          setPhone(isEmail ? "" : loginIdentifier);
+          setPhone(isEmail ? "" : formattedId);
           setStep("verify");
           toast.info("يرجى تأكيد حسابك عبر رمز التحقق");
           return;
@@ -72,11 +81,14 @@ const Auth = () => {
     
     setLoading(true);
     try {
+      const formattedPhone = formatPhone(phone);
+      setPhone(formattedPhone);
+
       const signUpParams: any = {
-        phone,
+        phone: formattedPhone,
         password,
         options: {
-          data: { full_name: phone }
+          data: { full_name: formattedPhone }
         }
       };
 
