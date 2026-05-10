@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cars: {
+        Row: {
+          brake_tire_services: Json | null
+          created_at: string
+          current_mileage: number
+          id: string
+          last_mileage_update: string | null
+          legal_docs: Json | null
+          make: string
+          mileage_history: Json | null
+          model: string
+          oil_services: Json | null
+          settings: Json | null
+          user_id: string
+          year: number
+        }
+        Insert: {
+          brake_tire_services?: Json | null
+          created_at?: string
+          current_mileage?: number
+          id?: string
+          last_mileage_update?: string | null
+          legal_docs?: Json | null
+          make: string
+          mileage_history?: Json | null
+          model: string
+          oil_services?: Json | null
+          settings?: Json | null
+          user_id: string
+          year: number
+        }
+        Update: {
+          brake_tire_services?: Json | null
+          created_at?: string
+          current_mileage?: number
+          id?: string
+          last_mileage_update?: string | null
+          legal_docs?: Json | null
+          make?: string
+          mileage_history?: Json | null
+          model?: string
+          oil_services?: Json | null
+          settings?: Json | null
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
