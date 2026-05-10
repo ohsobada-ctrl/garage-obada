@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Car } from 'lucide-react';
+import { NotificationService } from '@/services/notificationService';
 
 interface AddCarDialogProps {
-  // تأكد أن الأنواع هنا تتوافق مع ما تريده في قاعدة البيانات
   onAdd: (car: { make: string; model: string; year: number; currentMileage: number }) => void;
 }
 
@@ -14,23 +14,26 @@ export function AddCarDialog({ onAdd }: AddCarDialogProps) {
   const [open, setOpen] = useState(false);
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
-  // نبقيها نصوصاً هنا لسهولة المسح والـ Placeholder
   const [year, setYear] = useState<string>("");
   const [mileage, setMileage] = useState<string>("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!make.trim() || !model.trim()) return;
+    
+    // Request permission on user gesture
+    await NotificationService.requestPermissions();
     
     onAdd({
       make: make.trim(),
       model: model.trim(),
-      // التصحيح: تحويل النص إلى رقم عند الإرسال فقط
       year: Number(year),
       currentMileage: Number(mileage),
     });
+
+    // Schedule notifications for the new car
+    await NotificationService.scheduleMaintenanceAlerts(`${make} ${model}`);
     
-    // إعادة تعيين الحقول
     setMake('');
     setModel('');
     setYear('');
