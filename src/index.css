@@ -87,15 +87,19 @@
   }
 
   .status-safe {
-    @apply bg-success text-success-foreground;
+    background-color: hsl(var(--success));
+    color: hsl(var(--success-foreground));
   }
 
   .status-warning {
-    @apply bg-warning text-warning-foreground;
+    background-color: hsl(var(--warning));
+    color: hsl(var(--warning-foreground));
   }
 
   .status-danger {
-    @apply bg-destructive text-destructive-foreground animate-pulse;
+    background-color: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
+    @apply animate-pulse;
   }
 
   .gradient-gold {
