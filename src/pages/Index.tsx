@@ -257,7 +257,8 @@ const Index = () => {
             </Sheet>
           </div>
         </div>
-      </header>
+      </div>
+    </header>
 
       <main className="container pt-6">
         {cars.length > 0 && (
