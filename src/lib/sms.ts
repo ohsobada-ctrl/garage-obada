@@ -1,28 +1,18 @@
-export async function sendOTP(phoneNumber: string, otp: string) {
-  const accountSid = import.meta.env.VITE_TWILIO_ACCOUNT_SID || import.meta.env.TWILIO_ACCOUNT_SID;
-  const authToken = import.meta.env.VITE_TWILIO_AUTH_TOKEN || import.meta.env.TWILIO_AUTH_TOKEN;
-  const serviceSid = import.meta.env.VITE_TWILIO_MESSAGING_SERVICE_SID || import.meta.env.TWILIO_MESSAGING_SERVICE_SID;
+import { supabase } from "@/integrations/supabase/client";
 
+export async function sendOTP(phoneNumber: string, otp: string) {
   const message = `كود التحقق الخاص بمرآب أوباما هو: ${otp}`;
   
-  // نستخدم خدمة التحقق الرسمية أو الرسائل العادية
-  const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      'Body': message,
-      'MessagingServiceSid': serviceSid,
-      'To': phoneNumber,
-    })
+  // استدعاء الدالة التي أنشأناها في SQL Editor لتجنب مشاكل CORS
+  const { data, error } = await supabase.rpc('send_sms_via_twilio', {
+    to_phone: phoneNumber,
+    message_text: message
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || "فشل إرسال الرسالة الرسمية");
+  if (error) {
+    console.error("RPC Error:", error);
+    throw new Error(error.message || "فشل إرسال الرسالة عبر الخادم");
   }
 
-  return response.json();
+  return data;
 }
