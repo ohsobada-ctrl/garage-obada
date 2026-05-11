@@ -45,7 +45,7 @@ const Auth = () => {
 
     setLoading(true);
     try {
-      if (otp === generatedOtp || otp === "123456") {
+      if (otp === generatedOtp) {
         // تخزين رقم الهاتف كمعرف مستخدم في localStorage
         localStorage.setItem("garage_user_phone", phone);
         localStorage.setItem("garage_user_id", phone.replace(/\D/g, ""));
@@ -57,7 +57,8 @@ const Auth = () => {
         toast.error("كود التحقق غير صحيح");
       }
     } catch (error: any) {
-      toast.error("خطأ في التحقق: " + error.message);
+      console.error("Verification Error:", error);
+      toast.error("خطأ في التحقق: " + (error.message || "رمز غير معروف"));
     } finally {
       setLoading(false);
     }

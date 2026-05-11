@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export async function sendOTP(phoneNumber: string, otp: string) {
   const message = `كود التحقق الخاص بمرآب أوباما هو: ${otp}`;
   
