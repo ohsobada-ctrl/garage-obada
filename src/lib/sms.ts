@@ -1,23 +1,28 @@
-import { supabase } from "@/integrations/supabase/client";
+export async function sendOTP(phoneNumber: string, otp: string) {
+  const accountSid = import.meta.env.VITE_TWILIO_ACCOUNT_SID || import.meta.env.TWILIO_ACCOUNT_SID;
+  const authToken = import.meta.env.VITE_TWILIO_AUTH_TOKEN || import.meta.env.TWILIO_AUTH_TOKEN;
+  const serviceSid = import.meta.env.VITE_TWILIO_MESSAGING_SERVICE_SID || import.meta.env.TWILIO_MESSAGING_SERVICE_SID;
 
-/**
- * دالة لإرسال كود التحقق يدوياً عبر Supabase Edge Function (أكثر أماناً)
- * أو لاستخدامها في أغراض أخرى.
- */
-export const sendSMS = async (to: string, message: string) => {
-  try {
-    // ملاحظة: إرسال SMS مباشرة من الـ Frontend غير ممكن بسبب حماية Twilio (CORS)
-    // ولحماية الـ Auth Token الخاص بك.
-    // الطريقة الصحيحة هي استدعاء Edge Function.
-    
-    const { data, error } = await supabase.functions.invoke('send-sms', {
-      body: { to, message },
-    });
+  const message = `كود التحقق الخاص بمرآب أوباما هو: ${otp}`;
+  
+  // نستخدم خدمة التحقق الرسمية أو الرسائل العادية
+  const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      'Body': message,
+      'MessagingServiceSid': serviceSid,
+      'To': phoneNumber,
+    })
+  });
 
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error sending SMS:', error);
-    throw error;
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || "فشل إرسال الرسالة الرسمية");
   }
-};
+
+  return response.json();
+}

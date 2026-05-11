@@ -1,29 +1,31 @@
 import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
-import { AuthContext } from "@/lib/auth";
-import type { User } from "firebase/auth";
-import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
+import { AuthContext, CustomUser } from "@/lib/auth";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<CustomUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      setLoading(false);
-    });
+    // التحقق من وجود جلسة في localStorage
+    const storedPhone = localStorage.getItem("garage_user_phone");
+    const storedId = localStorage.getItem("garage_user_id");
 
-    return () => unsubscribe();
+    if (storedPhone && storedId) {
+      setUser({
+        uid: storedId,
+        phoneNumber: storedPhone,
+        phone: storedPhone
+      });
+    } else {
+      setUser(null);
+    }
+    setLoading(false);
   }, []);
 
   const signOut = async () => {
-    if (!auth) return;
-    await firebaseSignOut(auth);
+    localStorage.removeItem("garage_user_phone");
+    localStorage.removeItem("garage_user_id");
+    setUser(null);
   };
 
   return (
