@@ -10,13 +10,13 @@ export function useCarsSupabase() {
 
   // 1. Fetch Cars
   const { data: cars = [], isLoading } = useQuery({
-    queryKey: ["cars", user?.id],
+    queryKey: ["cars", user?.uid],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("cars")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", user.uid)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -46,7 +46,7 @@ export function useCarsSupabase() {
       
       const now = new Date().toISOString();
       const newCarData = {
-        user_id: user.id,
+        user_id: user.uid,
         make: car.make,
         model: car.model,
         year: car.year,

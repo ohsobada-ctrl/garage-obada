@@ -29,14 +29,14 @@ export function ProfileDialog() {
       const { data, error } = await supabase
         .from("profiles")
         .select("full_name, phone, avatar_url")
-        .eq("id", user?.id)
+        .eq("id", user?.uid)
         .single();
 
       if (error && error.code !== "PGRST116") throw error;
       
       if (data) {
         setFullName(data.full_name || "");
-        setPhone(data.phone || user?.phone || "");
+        setPhone(data.phone || user?.phoneNumber || "");
         setAvatarUrl(data.avatar_url || "");
       }
     } catch (error: any) {
@@ -50,7 +50,7 @@ export function ProfileDialog() {
     try {
       setLoading(true);
       const { error } = await supabase.from("profiles").upsert({
-        id: user?.id,
+        id: user?.uid,
         full_name: fullName,
         phone: phone,
         avatar_url: avatarUrl,
