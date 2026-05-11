@@ -1,160 +1,215 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Car, Loader2, Phone, CheckCircle2, ShieldCheck, ChevronRight } from "lucide-react";
-import { sendOTP } from "@/lib/sms";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { supabase } from "@/integrations/supabase/client";
+import { Mail, Send, MessageSquare } from "lucide-react";
 
-const Auth = () => {
+export default function Auth() {
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
-  const [step, setStep] = useState<"input" | "verify">("input");
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1); // 1: Info, 2: Method Choice, 3: OTP
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [method, setMethod] = useState<"email" | "telegram" | null>(null);
   const navigate = useNavigate();
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleSendInfo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) return toast.error("يرجى إدخال رقم الهاتف");
+    if (!email || !phone) {
+      return toast.error("يرجى إدخال البريد الإلكتروني ورقم الهاتف");
+    }
+    setStep(2);
+  };
+
+  const generateAndStoreOTP = async () => {
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(newOtp);
     
+    // تخزين الكود مؤقتاً في قاعدة البيانات لكي يتمكن البوت أو النظام من الوصول إليه
+    const { error } = await supabase.from('otp_codes').insert([
+      { email, phone, code: newOtp }
+    ]);
+    
+    if (error) {
+      console.error("Storage Error:", error);
+      throw new Error("فشل توليد كود التحقق");
+    }
+    
+    return newOtp;
+  };
+
+  const sendEmailOTP = async () => {
     setLoading(true);
     try {
-      // توليد كود عشوائي من 6 أرقام
+      const code = await generateAndStoreOTP();
+      // هنا نستخدم خاصية إرسال الإيميل من سوبابيس أو إشعار
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      if (error) throw error;
+      
+      toast.success("تم إرسال كود التحقق إلى بريدك الإلكتروني");
+      setMethod("email");
+      setStep(3);
+    } catch (error: any) {
+      toast.error("خطأ في إرسال الإيميل: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTelegramChoice = async () => {
+    setLoading(true);
+    try {
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(newOtp);
+      setMethod("telegram");
+      setStep(3);
       
-      // إرسال الكود عبر Twilio
-      await sendOTP(phone, newOtp);
-      
-      setStep("verify");
-      toast.success("تم إرسال كود التحقق بنجاح");
+      // نرسل الكود في رابط الـ start لكي يظهر للمستخدم في البوت
+      // الرابط سيكون: t.me/bot?start=CODE
+      window.open(`https://t.me/GarageObamaBot?start=${newOtp}`, "_blank");
+      toast.info("يرجى الضغط على Start في البوت لاستلام الكود");
     } catch (error: any) {
-      console.error(error);
-      toast.error("خطأ في إرسال الكود: " + error.message);
+      toast.error("خطأ: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!otp || otp.length < 6) return toast.error("يرجى إدخال كود التحقق كاملاً");
-
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
+    
     try {
-      if (otp === generatedOtp) {
-        // تخزين رقم الهاتف كمعرف مستخدم في localStorage
-        localStorage.setItem("garage_user_phone", phone);
-        localStorage.setItem("garage_user_id", phone.replace(/\D/g, ""));
-        
-        toast.success("تم تسجيل الدخول بنجاح");
-        navigate("/");
-        window.location.reload(); 
+      // التحقق من الكود (سواء كان إيميل سوبابيس أو كودنا المخصص)
+      if (method === "email") {
+        const { error } = await supabase.auth.verifyOtp({
+          email,
+          token: otp,
+          type: 'magiclink'
+        });
+        if (error) throw error;
       } else {
-        toast.error("كود التحقق غير صحيح");
+        if (otp !== generatedOtp) {
+          throw new Error("كود التحقق غير صحيح");
+        }
       }
+
+      localStorage.setItem("garage_user_phone", phone);
+      localStorage.setItem("garage_user_email", email);
+      localStorage.setItem("garage_user_id", email);
+      
+      toast.success("تم تسجيل الدخول بنجاح");
+      navigate("/");
+      window.location.reload();
     } catch (error: any) {
-      console.error("Verification Error:", error);
-      toast.error("خطأ في التحقق: " + (error.message || "رمز غير معروف"));
+      toast.error("فشل التحقق: " + error.message);
     } finally {
       setLoading(false);
     }
   };
-
-  if (step === "verify") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4 font-tajawal">
-        <Card className="w-full max-w-md border-border/40 bg-background/60 backdrop-blur-xl shadow-2xl">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <ShieldCheck className="w-8 h-8 text-primary" />
-            </div>
-            <CardTitle className="text-2xl font-bold">تأكيد الحساب</CardTitle>
-            <CardDescription className="text-base pt-2">أدخل الكود المرسل إلى {phone}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 pb-8">
-            <div className="flex justify-center" dir="ltr">
-              <InputOTP maxLength={6} value={otp} onChange={(val) => {
-                setOtp(val);
-                if (val.length === 6) handleVerifyOtp();
-              }}>
-                <InputOTPGroup className="gap-2">
-                  {[0, 1, 2, 3, 4, 5].map((i) => (
-                    <InputOTPSlot key={i} index={i} className="w-12 h-14 text-xl border-primary/20 focus:border-primary font-bold" />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
-            <Button className="w-full h-12 text-lg font-bold gradient-gold" onClick={() => handleVerifyOtp()} disabled={loading || otp.length < 6}>
-              {loading ? <Loader2 className="animate-spin ml-2" /> : "تأكيد والتحقق"}
-            </Button>
-            <Button variant="ghost" className="w-full h-10" onClick={() => setStep("input")}>
-              <ChevronRight className="w-4 h-4 ml-2" /> رجوع لتغيير الرقم
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 font-tajawal relative overflow-hidden">
-      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-3xl animate-pulse delay-700" />
-
-      <Card className="w-full max-w-md border-2 border-primary/10 shadow-2xl relative z-10 backdrop-blur-sm bg-background/95">
-        <div className="h-1.5 w-full gradient-gold" />
-        <CardHeader className="text-center space-y-4 pb-2">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-2xl gradient-gold flex items-center justify-center shadow-lg gold-glow animate-float">
-              <Car className="w-10 h-10 text-primary-foreground" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-bold tracking-tight">مرآب أوباما</CardTitle>
-            <CardDescription className="text-lg">تطبيقك المتكامل للعناية بسيارتك</CardDescription>
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">مرآب أوباما</CardTitle>
+          <CardDescription>نظام إدارة صيانة السيارات الاحترافي</CardDescription>
         </CardHeader>
-        <CardContent className="pt-6 pb-8">
-          <form onSubmit={handleSendOtp} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-bold block text-right pr-1">رقم الهاتف</label>
-              <div className="relative group">
+        <CardContent>
+          {step === 1 && (
+            <form onSubmit={handleSendInfo} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">البريد الإلكتروني</Label>
                 <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@mail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  dir="ltr"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">رقم الهاتف</Label>
+                <Input
+                  id="phone"
                   type="tel"
-                  placeholder="9x xxx xxxx"
+                  placeholder="+218..."
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="pl-10 text-left h-12 text-lg border-2 focus:ring-primary/20 transition-all group-hover:border-primary/30"
                   dir="ltr"
+                  required
                 />
-                <Phone className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
               </div>
-              <p className="text-xs text-muted-foreground text-right mt-2 pr-1">سيوصلك رمز تحقق عبر SMS لتأكيد رقمك</p>
+              <Button type="submit" className="w-full" disabled={loading}>
+                متابعة
+              </Button>
+            </form>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-4">
+              <p className="text-center text-sm text-gray-600 mb-4">اختر طريقة تأكيد الحساب</p>
+              <Button 
+                onClick={sendEmailOTP} 
+                variant="outline" 
+                className="w-full py-8 flex flex-col gap-2"
+                disabled={loading}
+              >
+                <Mail className="h-6 w-6 text-blue-500" />
+                <span>عبر البريد الإلكتروني</span>
+              </Button>
+              <Button 
+                onClick={handleTelegramChoice} 
+                variant="outline" 
+                className="w-full py-8 flex flex-col gap-2"
+                disabled={loading}
+              >
+                <MessageSquare className="h-6 w-6 text-sky-500" />
+                <span>عبر تليجرام (مجاني)</span>
+              </Button>
+              <Button variant="ghost" onClick={() => setStep(1)} className="w-full">
+                رجوع
+              </Button>
             </div>
-            <Button 
-              type="submit" 
-              className="w-full h-12 text-lg font-bold gradient-gold hover:opacity-90 transition-all shadow-md group"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="ml-2 h-5 w-5 animate-spin" />
-              ) : (
-                "إرسال كود التحقق"
-              )}
-            </Button>
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 opacity-70">
-              <CheckCircle2 className="w-3 h-3 text-green-500" />
-              <span>التحقق عبر Twilio الرسمي</span>
-            </div>
-          </form>
+          )}
+
+          {step === 3 && (
+            <form onSubmit={handleVerify} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="otp">أدخل كود التحقق</Label>
+                <Input
+                  id="otp"
+                  type="text"
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  className="text-center text-2xl tracking-widest"
+                  maxLength={6}
+                  required
+                />
+                <p className="text-xs text-center text-gray-500">
+                  {method === "email" 
+                    ? "تفقد بريدك الإلكتروني (بما في ذلك Junk/Spam)" 
+                    : "تفقد رسائل البوت في تليجرام"}
+                </p>
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "جاري التحقق..." : "تأكيد الدخول"}
+              </Button>
+              <Button variant="ghost" onClick={() => setStep(2)} className="w-full">
+                تغيير الطريقة
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default Auth;
+}
