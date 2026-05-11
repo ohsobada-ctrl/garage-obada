@@ -22,7 +22,7 @@ const Auth = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+    const apiKey = import.meta.env.VITE_FIREBASE_API_KEY || import.meta.env.FIREBASE_API_KEY;
     if (!apiKey || apiKey === "your_api_key") {
       setIsConfigMissing(true);
     }
