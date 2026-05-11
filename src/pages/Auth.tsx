@@ -71,7 +71,7 @@ export default function Auth() {
       
       // نرسل الكود في رابط الـ start لكي يظهر للمستخدم في البوت
       // الرابط سيكون: t.me/bot?start=CODE
-      window.open(`https://t.me/GarageObamaBot?start=${newOtp}`, "_blank");
+      window.open(`https://t.me/Garage3BOT?start=${newOtp}`, "_blank");
       toast.info("يرجى الضغط على Start في البوت لاستلام الكود");
     } catch (error: any) {
       toast.error("خطأ: " + error.message);
