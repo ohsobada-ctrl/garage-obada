@@ -10,6 +10,18 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-auth.useDeviceLanguage(); // استخدام لغة جهاز المستخدم (مثلاً العربية)
+// منع انهيار التطبيق في حال نقص الإعدادات
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "your_api_key") {
+  console.warn("Firebase configuration is missing or invalid. Authentication will not work.");
+}
+
+let auth: any;
+try {
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  auth.useDeviceLanguage();
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+}
+
+export { auth };

@@ -50,6 +50,10 @@ const Auth = () => {
     e.preventDefault();
     if (!phone) return toast.error("يرجى إدخال رقم الهاتف");
     
+    if (!auth) {
+      return toast.error("خدمة التحقق غير مهيأة بعد. يرجى ضبط إعدادات Firebase.");
+    }
+    
     setLoading(true);
     try {
       setupRecaptcha();
