@@ -1,9 +1,8 @@
-import { supabase } from "@/integrations/supabase/client";
-
 export async function sendOTP(phoneNumber: string, otp: string) {
   const message = `كود التحقق الخاص بمرآب أوباما هو: ${otp}`;
   
-  const { data, error } = await supabase.rpc('send_sms_via_twilio', {
+  // نستخدم الدالة V3 الجديدة لضمان استقرار الردود النصية
+  const { data, error } = await supabase.rpc('send_sms_v3', {
     to_phone: phoneNumber,
     message_text: message
   });
@@ -13,8 +12,9 @@ export async function sendOTP(phoneNumber: string, otp: string) {
     throw new Error(error.message || "فشل إرسال الرسالة عبر الخادم");
   }
 
-  // الرد الآن نص، لذا نتأكد أنه لا يحتوي على "error" من Twilio
+  // إذا كان الرد يحتوي على كلمة error، فهذا يعني خطأ من Twilio
   if (data && data.toLowerCase().includes('error')) {
+    console.error("Twilio Error Details:", data);
     throw new Error("خطأ من Twilio: " + data);
   }
 
