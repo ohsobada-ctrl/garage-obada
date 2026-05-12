@@ -29,14 +29,12 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1: Form, 2: Method Choice, 3: OTP, 4: Reset Password
+  const [step, setStep] = useState(1); 
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [method, setMethod] = useState<"email" | "telegram" | null>(null);
-  const [telegramNotLinked, setTelegramNotLinked] = useState(false);
   const [timer, setTimer] = useState(0);
   const navigate = useNavigate();
 
-  // تفعيل العداد عند إرسال الكود
   useEffect(() => {
     let interval: any;
     if (timer > 0) {
@@ -50,7 +48,6 @@ export default function Auth() {
   const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTelegramNotLinked(false);
 
     try {
       if (mode === "login") {
@@ -61,15 +58,7 @@ export default function Auth() {
         const { data, error } = await supabase.auth.signInWithPassword(loginData);
         if (error) throw error;
 
-        if (data.user) {
-          const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-          localStorage.setItem("garage_user_id", data.user.id);
-          localStorage.setItem("garage_user_email", data.user.email || "");
-          localStorage.setItem("garage_user_phone", profile?.phone || "");
-          localStorage.setItem("garage_user_name", profile?.full_name || "");
-        }
-        
-        toast.success("تم تسجيل الدخول بنجاح");
+        toast.success("تم تسجيل الدخول");
         navigate("/");
         window.location.reload();
       } else {
@@ -83,81 +72,77 @@ export default function Auth() {
     }
   };
 
-  const startOTPProcess = (chosenMethod: "email" | "telegram") => {
-    setMethod(chosenMethod);
+  const startOTPProcess = async (chosenMethod: "email" | "telegram") => {
+    setLoading(true);
     const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(newOtp);
-    return newOtp;
-  };
+    setMethod(chosenMethod);
+    
+    const targetPhone = mode === "signup" ? phone : identifier;
+    const targetEmail = isEmail(identifier) ? identifier : email;
 
-  const sendEmailOTP = async () => {
-    if (timer > 0) return;
-    setLoading(true);
-    try {
-      startOTPProcess("email");
-      const targetEmail = isEmail(identifier) ? identifier : email;
-      const { error } = await supabase.auth.signInWithOtp({ email: targetEmail });
-      if (error) throw error;
-      toast.success("تم إرسال الكود لبريدك الإلكتروني");
-      setStep(3);
-      setTimer(60);
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // حفظ الكود في قاعدة البيانات لكي يقرأه البوت أو أي نظام آخر
+    await supabase.from('otp_codes').insert([{ 
+      email: targetEmail, 
+      phone: targetPhone.replace("+", ""), 
+      code: newOtp 
+    }]);
 
-  const handleTelegramChoice = async () => {
-    if (timer > 0) return;
-    setLoading(true);
-    try {
-      const code = startOTPProcess("telegram");
-      const targetPhone = mode === "signup" ? phone : identifier;
-      
-      const { data: result, error } = await supabase.rpc('send_telegram_otp', { 
+    if (chosenMethod === "telegram") {
+      // محاولة إرسال عبر تليجرام
+      const { data: result } = await supabase.rpc('send_telegram_otp', { 
         p_phone: targetPhone.replace("+", ""), 
-        p_otp: code 
+        p_otp: newOtp 
       });
 
-      if (error) throw error;
-
       if (result === 'NOT_LINKED') {
-        setTelegramNotLinked(true);
+        window.open(`https://t.me/Garage3BOT`, "_blank");
+        toast.info("يرجى فتح البوت ومشاركة رقمك لاستلام الكود");
       } else {
-        toast.success("تم إرسال الكود عبر تليجرام");
-        setStep(3);
-        setTimer(60);
+        toast.success("تم إرسال الكود لتليجرام");
       }
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
+    } else {
+      // إرسال الكود عبر إيميل سوبابيس الرسمي (كـ OTP)
+      const { error } = await supabase.auth.signInWithOtp({ 
+        email: targetEmail,
+        options: { shouldCreateUser: mode === "signup" }
+      });
+      if (error) throw error;
+      toast.success("تم إرسال كود التحقق لبريدك");
     }
+
+    setStep(3);
+    setTimer(60);
+    setLoading(false);
   };
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp.length < 6) return toast.error("يرجى إدخال الكود كاملاً");
     setLoading(true);
-    
     try {
       const targetEmail = isEmail(identifier) ? identifier : email;
+      
+      // التحقق من الكود
       if (method === "email") {
-        const { error } = await supabase.auth.verifyOtp({ email: targetEmail, token: otp, type: 'magiclink' });
+        // التحقق الرسمي من سوبابيس
+        const { error } = await supabase.auth.verifyOtp({ 
+          email: targetEmail, 
+          token: otp, 
+          type: 'email' // نستخدم نوع email ليتطابق مع الـ OTP
+        });
         if (error) throw error;
       } else {
+        // التحقق اليدوي (لتليجرام)
         if (otp !== generatedOtp) throw new Error("كود التحقق غير صحيح");
       }
 
       if (mode === "signup") {
-        const { data: { user }, error: signUpError } = await supabase.auth.signUp({ email: targetEmail, password });
+        const { data: { user }, error: signUpError } = await supabase.auth.updateUser({ password });
         if (signUpError) throw signUpError;
         if (user) {
           await supabase.from('profiles').upsert({ id: user.id, full_name: fullName, phone });
-          localStorage.setItem("garage_user_id", user.id);
         }
-        toast.success("تم إنشاء الحساب بنجاح");
+        toast.success("تم إنشاء الحساب");
         navigate("/");
         window.location.reload();
       } else if (mode === "forgot") {
@@ -170,25 +155,34 @@ export default function Auth() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4 font-outfit relative overflow-hidden">
-      {/* خلفية جمالية */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/10 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      toast.success("تم تحديث كلمة السر");
+      setMode("login");
+      setStep(1);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      <Card className="w-full max-w-md border-white/10 bg-white/5 backdrop-blur-xl text-white shadow-2xl relative z-10">
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4 font-outfit relative">
+      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-amber-500/5 to-blue-500/5 pointer-events-none" />
+      
+      <Card className="w-full max-w-md border-white/10 bg-white/5 backdrop-blur-xl text-white">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-20 h-20 bg-gradient-to-tr from-amber-500 to-amber-300 rounded-2xl flex items-center justify-center rotate-3 shadow-xl">
-            <ShieldCheck className="h-10 w-10 text-black -rotate-3" />
+          <div className="mx-auto w-20 h-20 bg-amber-500 rounded-3xl flex items-center justify-center shadow-2xl">
+            <ShieldCheck className="h-10 w-10 text-black" />
           </div>
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-black tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-              {mode === "login" ? "تسجيل دخول" : mode === "signup" ? "إنشاء حساب" : "استعادة الحساب"}
-            </CardTitle>
-            <CardDescription className="text-gray-400 font-medium">
-              مرآب أوباما • نظام الإدارة المتكامل
-            </CardDescription>
-          </div>
+          <CardTitle className="text-3xl font-black">
+            {mode === "login" ? "تسجيل دخول" : mode === "signup" ? "إنشاء حساب" : "استعادة الحساب"}
+          </CardTitle>
         </CardHeader>
 
         <CardContent className="pt-6">
@@ -196,151 +190,87 @@ export default function Auth() {
             <form onSubmit={handleInitialSubmit} className="space-y-5">
               {mode === "signup" && (
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-widest text-gray-500 font-bold">الاسم الكامل</Label>
-                  <div className="relative group">
-                    <Input placeholder="أدخل اسمك" value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-white/5 border-white/10 h-12 focus:border-amber-500 transition-all pl-10" required />
-                    <User className="absolute left-3 top-3.5 h-5 w-5 text-gray-500 group-focus-within:text-amber-500 transition-colors" />
-                  </div>
+                  <Label className="text-xs font-bold text-gray-500">الاسم الكامل</Label>
+                  <Input placeholder="أدخل اسمك" value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-white/5 border-white/10 h-12" required />
                 </div>
               )}
-              
               <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-widest text-gray-500 font-bold">الإيميل أو الهاتف</Label>
-                <div className="relative group">
-                  <Input placeholder="example@mail.com" value={identifier} onChange={(e) => setIdentifier(e.target.value)} dir="ltr" className="bg-white/5 border-white/10 h-12 focus:border-amber-500 transition-all pl-10" required />
-                  <Mail className="absolute left-3 top-3.5 h-5 w-5 text-gray-500 group-focus-within:text-amber-500 transition-colors" />
-                </div>
+                <Label className="text-xs font-bold text-gray-500">الإيميل أو الهاتف</Label>
+                <Input placeholder="example@mail.com" value={identifier} onChange={(e) => setIdentifier(e.target.value)} dir="ltr" className="bg-white/5 border-white/10 h-12" required />
               </div>
-
               {mode === "signup" && (
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-widest text-gray-500 font-bold">رقم الهاتف</Label>
+                  <Label className="text-xs font-bold text-gray-500">رقم الهاتف</Label>
                   <Input placeholder="+218..." value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="bg-white/5 border-white/10 h-12" required />
                 </div>
               )}
-
               {mode !== "forgot" && (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-xs uppercase tracking-widest text-gray-500 font-bold">كلمة السر</Label>
-                    {mode === "login" && <button type="button" onClick={() => setMode("forgot")} className="text-xs text-amber-500 hover:text-amber-400 font-bold">نسيت كلمة السر؟</button>}
+                    <Label className="text-xs font-bold text-gray-500">كلمة السر</Label>
+                    {mode === "login" && <button type="button" onClick={() => setMode("forgot")} className="text-xs text-amber-500 font-bold">نسيت كلمة السر؟</button>}
                   </div>
-                  <div className="relative group">
-                    <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-white/5 border-white/10 h-12 focus:border-amber-500 transition-all pl-10" required />
-                    <Lock className="absolute left-3 top-3.5 h-5 w-5 text-gray-500 group-focus-within:text-amber-500 transition-colors" />
-                  </div>
+                  <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-white/5 border-white/10 h-12" required />
                 </div>
               )}
-              
-              <Button type="submit" className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-black font-black text-lg shadow-lg shadow-amber-500/20" disabled={loading}>
-                {loading ? <RefreshCw className="h-5 w-5 animate-spin" /> : "متابعة"}
+              <Button type="submit" className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-black font-black" disabled={loading}>
+                {loading ? <RefreshCw className="animate-spin" /> : "متابعة"}
               </Button>
             </form>
           )}
 
           {step === 2 && (
-            <div className="space-y-6 animate-in fade-in zoom-in-95">
-              {telegramNotLinked ? (
-                <div className="p-8 bg-amber-500/5 border border-amber-500/20 rounded-3xl text-center space-y-6">
-                  <div className="mx-auto w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center">
-                    <MessageSquare className="h-8 w-8 text-amber-500" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-amber-500">مطلوب ربط تليجرام</h3>
-                    <p className="text-sm text-gray-400 leading-relaxed">لأمان حسابك، يرجى فتح البوت ومشاركة رقم هاتفك (مرة واحدة فقط) لتتمكن من استلام الأكواد.</p>
-                  </div>
-                  <Button onClick={() => window.open(`https://t.me/Garage3BOT`, "_blank")} className="w-full h-12 bg-sky-500 hover:bg-sky-600 font-bold">
-                    فتح البوت للربط الآن
-                  </Button>
-                  <button onClick={() => setTelegramNotLinked(false)} className="text-xs text-gray-500 hover:underline">رجوع للخيارات</button>
-                </div>
-              ) : (
-                <>
-                  <div className="text-center space-y-1">
-                    <h3 className="text-lg font-bold">تأكيد الهوية</h3>
-                    <p className="text-sm text-gray-500">اختر الطريقة التي تفضلها لاستلام الكود</p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    <button onClick={sendEmailOTP} className="group w-full p-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center gap-4 transition-all" disabled={loading}>
-                      <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Mail className="h-6 w-6 text-blue-500" />
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold">البريد الإلكتروني</div>
-                        <div className="text-xs text-gray-500">يصلك الكود فوراً</div>
-                      </div>
-                    </button>
-                    <button onClick={handleTelegramChoice} className="group w-full p-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center gap-4 transition-all" disabled={loading}>
-                      <div className="w-12 h-12 rounded-xl bg-sky-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <MessageSquare className="h-6 w-6 text-sky-500" />
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold">تليجرام (آمن)</div>
-                        <div className="text-xs text-gray-500">الخيار الأسرع في ليبيا</div>
-                      </div>
-                    </button>
-                  </div>
-                </>
-              )}
+            <div className="space-y-6">
+              <div className="text-center space-y-1">
+                <h3 className="text-lg font-bold">طريقة التحقق</h3>
+                <p className="text-sm text-gray-500">اختر أين تريد استلام كود الـ OTP</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                <Button onClick={() => startOTPProcess("email")} variant="outline" className="h-20 bg-white/5 border-white/10 flex flex-col">
+                  <Mail className="h-6 w-6 text-blue-500 mb-1" />
+                  <span>البريد الإلكتروني</span>
+                </Button>
+                <Button onClick={() => startOTPProcess("telegram")} variant="outline" className="h-20 bg-white/5 border-white/10 flex flex-col">
+                  <MessageSquare className="h-6 w-6 text-sky-500 mb-1" />
+                  <span>تليجرام (موصى به)</span>
+                </Button>
+              </div>
             </div>
           )}
 
           {step === 3 && (
-            <form onSubmit={handleVerify} className="space-y-8 animate-in slide-in-from-bottom-8">
-              <div className="text-center space-y-4">
-                <div className="inline-flex p-3 bg-amber-500/10 rounded-full">
-                  <ShieldCheck className="h-8 w-8 text-amber-500" />
-                </div>
-                <h3 className="text-xl font-bold">أدخل كود التحقق</h3>
-                <p className="text-sm text-gray-500">أرسلنا كوداً من 6 أرقام إلى {method === "email" ? "بريدك" : "تليجرام"}</p>
-                
-                <div className="flex justify-center gap-2">
-                  <Input 
-                    value={otp} 
-                    onChange={(e) => setOtp(e.target.value)} 
-                    className="w-full max-w-[200px] text-center text-3xl font-black h-16 bg-white/5 border-amber-500/30 text-amber-500 tracking-[0.3em] rounded-2xl focus:border-amber-500" 
-                    maxLength={6} 
-                    required 
-                    autoFocus
-                  />
-                </div>
-
+            <form onSubmit={handleVerify} className="space-y-8 text-center">
+              <h3 className="text-xl font-bold">أدخل كود التحقق</h3>
+              <Input 
+                value={otp} 
+                onChange={(e) => setOtp(e.target.value)} 
+                className="text-center text-4xl h-16 bg-white/5 border-amber-500/50 text-amber-500 tracking-widest font-black" 
+                maxLength={6} 
+                required 
+              />
+              <div className="space-y-4">
+                <Button type="submit" className="w-full h-14 bg-amber-500 text-black font-black text-lg" disabled={loading}>تأكيد</Button>
                 {timer > 0 ? (
-                  <p className="text-xs text-gray-500">يمكنك إعادة الطلب بعد <span className="text-amber-500 font-bold">{timer}</span> ثانية</p>
+                  <p className="text-xs text-gray-500">إعادة الطلب بعد {timer} ثانية</p>
                 ) : (
-                  <button type="button" onClick={method === "email" ? sendEmailOTP : handleTelegramChoice} className="text-xs text-amber-500 font-bold hover:underline flex items-center mx-auto gap-1">
-                    <RefreshCw className="h-3 w-3" /> إعادة إرسال الكود
-                  </button>
+                  <button type="button" onClick={() => startOTPProcess(method!)} className="text-xs text-amber-500 font-bold">إعادة إرسال الكود</button>
                 )}
               </div>
-              <Button type="submit" className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-black font-black text-lg rounded-2xl" disabled={loading}>
-                {loading ? <RefreshCw className="h-5 w-5 animate-spin" /> : "تأكيد الدخول"}
-              </Button>
             </form>
           )}
 
           {step === 4 && (
-            <form onSubmit={handleResetPassword} className="space-y-5 animate-in zoom-in-95">
-              <div className="space-y-2 text-center">
-                <div className="mx-auto w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mb-4">
-                  <CheckCircle2 className="h-8 w-8 text-green-500" />
-                </div>
-                <h3 className="text-xl font-bold">تم التحقق بنجاح</h3>
-                <p className="text-sm text-gray-500">أدخل كلمة سر جديدة قوية لحسابك</p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-widest text-gray-500 font-bold">كلمة السر الجديدة</Label>
-                <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-white/5 border-white/10 h-12" required />
-              </div>
-              <Button type="submit" className="w-full h-14 bg-amber-500 text-black font-black rounded-2xl">تحديث ودخول</Button>
+            <form onSubmit={handleResetPassword} className="space-y-5">
+              <Label className="text-xs font-bold text-gray-500">كلمة السر الجديدة</Label>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-white/5 border-white/10 h-12" required />
+              <Button type="submit" className="w-full h-14 bg-amber-500 text-black font-black">تحديث كلمة السر</Button>
             </form>
           )}
         </CardContent>
 
         <CardFooter className="flex justify-center border-t border-white/5 pt-6 pb-8">
-          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setStep(1); }} className="group text-sm flex items-center gap-2 text-gray-500 hover:text-amber-500 transition-colors">
-            <span>{mode === "login" ? "لا تملك حساباً؟ سجل الآن" : "لديك حساب؟ سجل دخولك"}</span>
-            <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setStep(1); }} className="text-sm text-gray-500 hover:text-amber-500 transition-colors">
+            {mode === "login" ? "إنشاء حساب جديد" : "العودة لتسجيل الدخول"}
           </button>
         </CardFooter>
       </Card>
