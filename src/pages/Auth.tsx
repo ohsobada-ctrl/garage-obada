@@ -13,11 +13,8 @@ import {
   LogIn, 
   ArrowRight, 
   Lock, 
-  KeyRound, 
-  User, 
-  RefreshCw,
   ShieldCheck,
-  CheckCircle2
+  RefreshCw
 } from "lucide-react";
 
 export default function Auth() {
@@ -29,17 +26,14 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); 
-  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [step, setStep] = useState(1); // 1: Form, 2: Method Choice, 3: OTP, 4: Reset Password
   const [method, setMethod] = useState<"email" | "telegram" | null>(null);
   const [timer, setTimer] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     let interval: any;
-    if (timer > 0) {
-      interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
-    }
+    if (timer > 0) interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
     return () => clearInterval(interval);
   }, [timer]);
 
@@ -48,17 +42,12 @@ export default function Auth() {
   const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       if (mode === "login") {
-        const loginData = isEmail(identifier) 
-          ? { email: identifier, password } 
-          : { phone: identifier, password };
-
-        const { data, error } = await supabase.auth.signInWithPassword(loginData);
+        const loginData = isEmail(identifier) ? { email: identifier, password } : { phone: identifier, password };
+        const { error } = await supabase.auth.signInWithPassword(loginData);
         if (error) throw error;
-
-        toast.success("تم تسجيل الدخول");
+        toast.success("تم تسجيل الدخول بنجاح");
         navigate("/");
         window.location.reload();
       } else {
@@ -72,81 +61,73 @@ export default function Auth() {
     }
   };
 
-  const startOTPProcess = async (chosenMethod: "email" | "telegram") => {
+  const handleOTPRequest = async (chosenMethod: "email" | "telegram") => {
+    if (timer > 0) return;
     setLoading(true);
-    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(newOtp);
-    setMethod(chosenMethod);
-    
-    const targetPhone = mode === "signup" ? phone : identifier;
-    const targetEmail = isEmail(identifier) ? identifier : email;
-
-    // حفظ الكود في قاعدة البيانات لكي يقرأه البوت أو أي نظام آخر
-    await supabase.from('otp_codes').insert([{ 
-      email: targetEmail, 
-      phone: targetPhone.replace("+", ""), 
-      code: newOtp 
-    }]);
-
-    if (chosenMethod === "telegram") {
-      // محاولة إرسال عبر تليجرام
-      const { data: result } = await supabase.rpc('send_telegram_otp', { 
-        p_phone: targetPhone.replace("+", ""), 
-        p_otp: newOtp 
-      });
-
-      if (result === 'NOT_LINKED') {
-        window.open(`https://t.me/Garage3BOT`, "_blank");
-        toast.info("يرجى فتح البوت ومشاركة رقمك لاستلام الكود");
+    try {
+      const targetIdentifier = chosenMethod === "email" ? (isEmail(identifier) ? identifier : email) : (mode === "signup" ? phone : identifier);
+      
+      if (chosenMethod === "email") {
+        // استخدام نظام سوبابيس الرسمي للإيميل (أمن جداً)
+        const { error } = await supabase.auth.signInWithOtp({ email: targetIdentifier });
+        if (error) throw error;
       } else {
-        toast.success("تم إرسال الكود لتليجرام");
+        // استخدام دالة السيرفر الآمنة للتليجرام
+        const { data, error } = await supabase.rpc('request_otp_secure', { 
+          p_identifier: targetIdentifier, 
+          p_method: 'telegram' 
+        });
+        if (error) throw error;
+        if (data === 'NOT_LINKED') {
+          window.open(`https://t.me/Garage3BOT`, "_blank");
+          return toast.info("يرجى ربط البوت أولاً");
+        }
       }
-    } else {
-      // إرسال الكود عبر إيميل سوبابيس الرسمي (كـ OTP)
-      const { error } = await supabase.auth.signInWithOtp({ 
-        email: targetEmail,
-        options: { shouldCreateUser: mode === "signup" }
-      });
-      if (error) throw error;
-      toast.success("تم إرسال كود التحقق لبريدك");
-    }
 
-    setStep(3);
-    setTimer(60);
-    setLoading(false);
+      setMethod(chosenMethod);
+      setStep(3);
+      setTimer(60);
+      toast.success("تم إرسال كود التحقق بنجاح");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const targetEmail = isEmail(identifier) ? identifier : email;
+      const targetIdentifier = method === "email" ? (isEmail(identifier) ? identifier : email) : (mode === "signup" ? phone : identifier);
       
-      // التحقق من الكود
+      let isValid = false;
       if (method === "email") {
-        // التحقق الرسمي من سوبابيس
-        const { error } = await supabase.auth.verifyOtp({ 
-          email: targetEmail, 
-          token: otp, 
-          type: 'email' // نستخدم نوع email ليتطابق مع الـ OTP
+        const { error } = await supabase.auth.verifyOtp({ email: targetIdentifier, token: otp, type: 'email' });
+        if (error) throw error;
+        isValid = true;
+      } else {
+        // التحقق في السيرفر حصراً
+        const { data, error } = await supabase.rpc('verify_otp_secure', { 
+          p_identifier: targetIdentifier, 
+          p_code: otp 
         });
         if (error) throw error;
-      } else {
-        // التحقق اليدوي (لتليجرام)
-        if (otp !== generatedOtp) throw new Error("كود التحقق غير صحيح");
+        if (!data) throw new Error("الكود غير صحيح أو انتهت صلاحيته");
+        isValid = true;
       }
 
-      if (mode === "signup") {
-        const { data: { user }, error: signUpError } = await supabase.auth.updateUser({ password });
-        if (signUpError) throw signUpError;
-        if (user) {
-          await supabase.from('profiles').upsert({ id: user.id, full_name: fullName, phone });
+      if (isValid) {
+        if (mode === "signup") {
+          const { data: { user }, error: signUpError } = await supabase.auth.signUp({ email: targetIdentifier, password });
+          if (signUpError) throw signUpError;
+          if (user) await supabase.from('profiles').upsert({ id: user.id, full_name: fullName, phone });
+          toast.success("تم إنشاء الحساب بنجاح");
+          navigate("/");
+          window.location.reload();
+        } else if (mode === "forgot") {
+          setStep(4);
         }
-        toast.success("تم إنشاء الحساب");
-        navigate("/");
-        window.location.reload();
-      } else if (mode === "forgot") {
-        setStep(4);
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -173,11 +154,9 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4 font-outfit relative">
-      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-amber-500/5 to-blue-500/5 pointer-events-none" />
-      
-      <Card className="w-full max-w-md border-white/10 bg-white/5 backdrop-blur-xl text-white">
+      <Card className="w-full max-w-md border-white/10 bg-white/5 backdrop-blur-xl text-white shadow-2xl">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-20 h-20 bg-amber-500 rounded-3xl flex items-center justify-center shadow-2xl">
+          <div className="mx-auto w-20 h-20 bg-amber-500 rounded-3xl flex items-center justify-center">
             <ShieldCheck className="h-10 w-10 text-black" />
           </div>
           <CardTitle className="text-3xl font-black">
@@ -222,17 +201,15 @@ export default function Auth() {
           {step === 2 && (
             <div className="space-y-6">
               <div className="text-center space-y-1">
-                <h3 className="text-lg font-bold">طريقة التحقق</h3>
-                <p className="text-sm text-gray-500">اختر أين تريد استلام كود الـ OTP</p>
+                <h3 className="text-lg font-bold">طريقة التحقق الآمنة</h3>
+                <p className="text-sm text-gray-500">اختر أين تريد استلام كود الـ OTP المولد في السيرفر</p>
               </div>
               <div className="grid grid-cols-1 gap-4">
-                <Button onClick={() => startOTPProcess("email")} variant="outline" className="h-20 bg-white/5 border-white/10 flex flex-col">
-                  <Mail className="h-6 w-6 text-blue-500 mb-1" />
-                  <span>البريد الإلكتروني</span>
+                <Button onClick={() => handleOTPRequest("email")} variant="outline" className="h-20 bg-white/5 border-white/10">
+                  <Mail className="ml-3 h-6 w-6 text-blue-500" /> البريد الإلكتروني
                 </Button>
-                <Button onClick={() => startOTPProcess("telegram")} variant="outline" className="h-20 bg-white/5 border-white/10 flex flex-col">
-                  <MessageSquare className="h-6 w-6 text-sky-500 mb-1" />
-                  <span>تليجرام (موصى به)</span>
+                <Button onClick={() => handleOTPRequest("telegram")} variant="outline" className="h-20 bg-white/5 border-white/10">
+                  <MessageSquare className="ml-3 h-6 w-6 text-sky-500" /> تليجرام (آمن)
                 </Button>
               </div>
             </div>
@@ -244,16 +221,16 @@ export default function Auth() {
               <Input 
                 value={otp} 
                 onChange={(e) => setOtp(e.target.value)} 
-                className="text-center text-4xl h-16 bg-white/5 border-amber-500/50 text-amber-500 tracking-widest font-black" 
+                className="text-center text-4xl h-16 bg-white/5 border-amber-500 text-amber-500 tracking-widest font-black" 
                 maxLength={6} 
                 required 
               />
               <div className="space-y-4">
-                <Button type="submit" className="w-full h-14 bg-amber-500 text-black font-black text-lg" disabled={loading}>تأكيد</Button>
+                <Button type="submit" className="w-full h-14 bg-amber-500 text-black font-black text-lg" disabled={loading}>تأكيد الكود</Button>
                 {timer > 0 ? (
-                  <p className="text-xs text-gray-500">إعادة الطلب بعد {timer} ثانية</p>
+                  <p className="text-xs text-gray-500">يمكنك إعادة الطلب بعد {timer} ثانية</p>
                 ) : (
-                  <button type="button" onClick={() => startOTPProcess(method!)} className="text-xs text-amber-500 font-bold">إعادة إرسال الكود</button>
+                  <button type="button" onClick={() => handleOTPRequest(method!)} className="text-xs text-amber-500 font-bold">إعادة إرسال الكود</button>
                 )}
               </div>
             </form>
@@ -269,7 +246,7 @@ export default function Auth() {
         </CardContent>
 
         <CardFooter className="flex justify-center border-t border-white/5 pt-6 pb-8">
-          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setStep(1); }} className="text-sm text-gray-500 hover:text-amber-500 transition-colors">
+          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setStep(1); }} className="text-sm text-gray-500 hover:text-amber-500">
             {mode === "login" ? "إنشاء حساب جديد" : "العودة لتسجيل الدخول"}
           </button>
         </CardFooter>
