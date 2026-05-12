@@ -7,32 +7,42 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-Deno.serve(async (req) => {
+interface TelegramPayload {
+  message?: {
+    chat?: { id: number };
+    text?: string;
+    contact?: { phone_number: string };
+  };
+}
+
+Deno.serve(async (req: Request) => {
   try {
-    const payload = await req.json()
+    const payload: TelegramPayload = await req.json()
     const chatId = payload.message?.chat?.id
     const text = payload.message?.text
     const contact = payload.message?.contact
 
-    // 1. التعامل مع مشاركة رقم الهاتف (تأكيد الهوية)
+    if (!chatId) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    }
+
+    // 1. التعامل مع مشاركة رقم الهاتف
     if (contact) {
       const phone = contact.phone_number.replace('+', '')
       
-      // تحديث الجلسة في قاعدة البيانات
       const { error } = await supabase
         .from('auth_sessions')
         .update({ status: 'verified' })
         .eq('phone', phone)
         .order('created_at', { ascending: false })
-        .limit(1)
 
       if (error) throw error
 
-      await sendTelegramMessage(chatId, "✅ تم تأكيد هويتك بنجاح! ارجع للتطبيق الآن، ستجد أنه فتح تلقائياً. 🚗✨")
+      await sendTelegramMessage(chatId, "✅ تم تأكيد هويتك بنجاح! ارجع للتطبيق الآن.")
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
 
-    // 2. التعامل مع رسالة البداية
+    // 2. رسالة البداية
     if (text?.startsWith('/start')) {
       await sendTelegramMessage(chatId, "🛡️ مرحباً بك في مرآب أوباما.\n\nيرجى الضغط على الزر أدناه لتأكيد رقم هاتفك والدخول للتطبيق بأمان.", {
         keyboard: [[{ text: "📲 تأكيد هويتي الآن", request_contact: true }]],
@@ -43,6 +53,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ ok: true }), { status: 200 })
   } catch (err) {
+    console.error('Error:', err.message)
     return new Response(JSON.stringify({ error: err.message }), { status: 400 })
   }
 })
