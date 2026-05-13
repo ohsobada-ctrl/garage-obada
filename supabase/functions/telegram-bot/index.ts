@@ -10,20 +10,33 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 interface TelegramPayload {
   message?: {
     chat?: { id: number };
+    from?: { id: number; first_name?: string };
     text?: string;
-    contact?: { phone_number: string };
+    contact?: { 
+      phone_number: string;
+      user_id?: number;
+    };
   };
 }
 
 Deno.serve(async (req: Request) => {
   try {
+    // التحقق من أن الطلب POST
+    if (req.method !== 'POST') {
+      return new Response('Method Not Allowed', { status: 405 })
+    }
+
     const payload: TelegramPayload = await req.json()
+    console.log('Received Payload:', JSON.stringify(payload))
+
     const chatId = payload.message?.chat?.id
     const text = payload.message?.text
     const contact = payload.message?.contact
+    const fromId = payload.message?.from?.id
 
     if (!chatId) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      console.log('No Chat ID found in payload')
+      return new Response(JSON.stringify({ ok: true, message: 'No chat id' }), { status: 200 })
     }
 
     // 1. توليد رمز OTP عشوائي
@@ -31,20 +44,19 @@ Deno.serve(async (req: Request) => {
 
     // 2. التعامل مع مشاركة رقم الهاتف
     if (contact) {
-      const fromId = payload.message?.from?.id
-      const contactUserId = (payload.message?.contact as any)?.user_id
+      console.log('Processing contact sharing...')
+      const contactUserId = contact.user_id
 
       // شرط الأمان: التأكد أن الرقم يخص نفس الشخص الذي أرسله
-      if (contactUserId && fromId !== contactUserId) {
+      if (contactUserId && fromId && fromId !== contactUserId) {
+        console.warn('Security Warning: User ID mismatch')
         await sendTelegramMessage(chatId, "⚠️ عذراً، يجب مشاركة رقم هاتفك الشخصي المرتبط بهذا الحساب.")
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
       }
 
-      let phone = contact.phone_number.replace(/\D/g, '') // تنظيف الرقم
-      
-      console.log(`Processing verified contact for phone: ${phone}`)
+      let phone = contact.phone_number.replace(/\D/g, '')
+      console.log(`Verified phone: ${phone}`)
 
-      // تحديث أو إنشاء سجل الجلسة (Upsert)
       const { error } = await supabase
         .from('auth_sessions')
         .upsert({ 
@@ -55,7 +67,7 @@ Deno.serve(async (req: Request) => {
         }, { onConflict: 'phone' })
 
       if (error) {
-        console.error('Database Error:', error)
+        console.error('Supabase Error:', error)
         throw error
       }
 
@@ -65,6 +77,7 @@ Deno.serve(async (req: Request) => {
 
     // 3. رسالة البداية
     if (text?.startsWith('/start')) {
+      console.log('Handling /start command')
       await sendTelegramMessage(chatId, "🛡️ مرحباً بك في Garage.\n\nيرجى الضغط على الزر أدناه للحصول على رمز الدخول الخاص بك.", {
         keyboard: [[{ text: "📲 الحصول على رمز الدخول", request_contact: true }]],
         resize_keyboard: true,
@@ -74,20 +87,26 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ ok: true }), { status: 200 })
   } catch (err) {
-    console.error('Error:', err.message)
+    console.error('Final Error Catch:', err.message)
     return new Response(JSON.stringify({ error: err.message }), { status: 400 })
   }
 })
 
 async function sendTelegramMessage(chatId: number, text: string, replyMarkup?: any) {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      reply_markup: replyMarkup
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        reply_markup: replyMarkup
+      })
     })
-  })
+    const result = await res.json()
+    console.log('Telegram API Response:', JSON.stringify(result))
+  } catch (error) {
+    console.error('Failed to send Telegram message:', error)
+  }
 }
