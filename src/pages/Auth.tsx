@@ -183,6 +183,17 @@ export default function Auth() {
               </div>
               <button type="button" onClick={() => setMode("forgot")} className="text-[#F59E0B] text-sm font-bold hover:underline">نسيت كلمة المرور؟</button>
               <Button type="submit" disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">تسجيل الدخول</Button>
+
+              {loginMethod === "phone" && (
+                <Button 
+                  type="button" 
+                  onClick={() => handleSendOTP("telegram")} 
+                  className="w-full h-14 bg-sky-500 hover:bg-sky-600 text-white font-bold text-md rounded-xl flex items-center justify-center gap-2 mt-2"
+                >
+                  <MessageSquare className="h-5 w-5" />
+                  دخول سريع عبر تيليجرام
+                </Button>
+              )}
             </>
           )}
 
