@@ -115,10 +115,11 @@ export default function Auth() {
            if (signUpError) throw signUpError;
         }
       } else {
+        // التحقق من كود الإيميل
         const { error } = await supabase.auth.verifyOtp({
-          email: email.toLowerCase(),
+          email: identifier.toLowerCase() || email.toLowerCase(),
           token: otp,
-          type: mode === "forgot" ? 'recovery' : 'signup',
+          type: mode === "forgot" ? 'recovery' : (mode === "signup" ? 'signup' : 'magiclink'),
         });
         if (error) throw error;
       }
