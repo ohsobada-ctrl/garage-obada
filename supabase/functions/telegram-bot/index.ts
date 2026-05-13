@@ -1,7 +1,7 @@
 // supabase/functions/telegram-bot/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
-const BOT_TOKEN = '8694896406:AAFM229p4Xo0dq6mfYnbOTgGWj8cmMbDNE0'
+const BOT_TOKEN = '8694896406:AAEspC9Hr_sYfdPc9AANB1mqO3sQ94GXELI'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
@@ -31,9 +31,18 @@ Deno.serve(async (req: Request) => {
 
     // 2. التعامل مع مشاركة رقم الهاتف
     if (contact) {
-      let phone = contact.phone_number.replace(/\D/g, '') // تنظيف الرقم من أي رموز
+      const fromId = payload.message?.from?.id
+      const contactUserId = (payload.message?.contact as any)?.user_id
+
+      // شرط الأمان: التأكد أن الرقم يخص نفس الشخص الذي أرسله
+      if (contactUserId && fromId !== contactUserId) {
+        await sendTelegramMessage(chatId, "⚠️ عذراً، يجب مشاركة رقم هاتفك الشخصي المرتبط بهذا الحساب.")
+        return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      }
+
+      let phone = contact.phone_number.replace(/\D/g, '') // تنظيف الرقم
       
-      console.log(`Processing contact for phone: ${phone}`)
+      console.log(`Processing verified contact for phone: ${phone}`)
 
       // تحديث أو إنشاء سجل الجلسة (Upsert)
       const { error } = await supabase
@@ -50,7 +59,7 @@ Deno.serve(async (req: Request) => {
         throw error
       }
 
-      await sendTelegramMessage(chatId, `🔑 رمز التحقق الخاص بك لـ Garage هو: \n\n ${otp} \n\n يرجى إدخاله في التطبيق لإتمام الدخول.`)
+      await sendTelegramMessage(chatId, `✅ تم استلام رقمك بنجاح.\n\n🔑 رمز التحقق الخاص بك لـ Garage هو:\n\n ${otp} \n\n يرجى إدخاله في التطبيق لإتمام العملية.`)
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
 
