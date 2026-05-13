@@ -72,7 +72,7 @@ export default function Auth() {
     setLoading(true);
     try {
       if (method === "telegram") {
-        const phone = cleanPhone(phoneNumber);
+        const phone = cleanPhone(phoneNumber || identifier);
         if (!phone) throw new Error("يرجى إدخال رقم الهاتف أولاً");
         await supabase.from('auth_sessions').upsert({ phone, status: 'pending' }, { onConflict: 'phone' });
         window.open(`https://t.me/Garage3BOT`, "_blank");
@@ -94,7 +94,7 @@ export default function Auth() {
     setLoading(true);
     try {
       if (otpTarget === "telegram") {
-        const phone = cleanPhone(phoneNumber);
+        const phone = cleanPhone(phoneNumber || identifier);
         const { data, error } = await supabase
           .from('auth_sessions')
           .select('*')
