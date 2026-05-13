@@ -14,7 +14,8 @@ import {
   Eye, 
   EyeOff,
   MessageSquare,
-  ChevronLeft
+  ChevronLeft,
+  ArrowRight
 } from "lucide-react";
 
 type AuthMode = "login" | "signup" | "forgot" | "verify_method" | "otp_input";
