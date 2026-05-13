@@ -29,22 +29,28 @@ Deno.serve(async (req: Request) => {
     // 1. توليد رمز OTP عشوائي
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
 
-    // 2. التعامل مع مشاركة رقم الهاتف (الطريقة الأكثر أماناً)
+    // 2. التعامل مع مشاركة رقم الهاتف
     if (contact) {
-      const phone = contact.phone_number.replace('+', '')
+      let phone = contact.phone_number.replace(/\D/g, '') // تنظيف الرقم من أي رموز
       
-      // حفظ الرمز في قاعدة البيانات
+      console.log(`Processing contact for phone: ${phone}`)
+
+      // تحديث أو إنشاء سجل الجلسة (Upsert)
       const { error } = await supabase
         .from('auth_sessions')
-        .update({ 
+        .upsert({ 
+          phone: phone,
           otp_code: otp,
-          status: 'awaiting_otp'
-        })
-        .eq('phone', phone)
+          status: 'awaiting_otp',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'phone' })
 
-      if (error) throw error
+      if (error) {
+        console.error('Database Error:', error)
+        throw error
+      }
 
-      await sendTelegramMessage(chatId, `🔑 رمز التحقق الخاص بك هو: \n\n${otp}\n\nيرجى إدخاله في التطبيق لإتمام الدخول.`)
+      await sendTelegramMessage(chatId, `🔑 رمز التحقق الخاص بك لمرآب أوباما هو: \n\n ${otp} \n\n يرجى إدخاله في التطبيق لإتمام الدخول.`)
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
 
