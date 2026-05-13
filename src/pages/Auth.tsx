@@ -23,6 +23,7 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [waitingForTelegram, setWaitingForTelegram] = useState(false);
   const navigate = useNavigate();
@@ -49,6 +50,37 @@ export default function Auth() {
     }
     return () => clearInterval(interval);
   }, [waitingForTelegram, identifier]);
+
+  const handleVerifyOTP = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('auth_sessions')
+        .select('*')
+        .eq('phone', identifier.replace('+', ''))
+        .eq('otp_code', otp)
+        .eq('status', 'awaiting_otp')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data) {
+        throw new Error("الرمز غير صحيح أو انتهت صلاحيته.");
+      }
+
+      // تحديث الحالة لتم بنجاح
+      await supabase
+        .from('auth_sessions')
+        .update({ status: 'verified' })
+        .eq('id', data.id);
+
+      handleFinalLogin();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFinalLogin = async () => {
     toast.success("✅ تم تأكيد هويتك بنجاح! جاري تسجيل الدخول...");
@@ -127,18 +159,38 @@ export default function Auth() {
 
         <CardContent className="pt-6">
           {waitingForTelegram ? (
-            <div className="text-center space-y-6 py-8">
-              <div className="relative mx-auto w-20 h-20">
-                <RefreshCw className="h-20 w-20 text-amber-500 animate-spin opacity-20" />
+            <div className="text-center space-y-6 py-4">
+              <div className="relative mx-auto w-16 h-16">
                 <MessageSquare className="absolute inset-0 m-auto h-10 w-10 text-sky-500 animate-bounce" />
               </div>
-              <div className="space-y-2">
-                <p className="text-lg font-bold">يرجى مشاركة رقمك في البوت</p>
-                <p className="text-sm text-gray-500">بمجرد الضغط على "مشاركة الرقم" في تليجرام، سيفتح هذا التطبيق تلقائياً.</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-lg font-bold">أدخل رمز التحقق</p>
+                  <p className="text-xs text-gray-500">تم إرسال رمز مكون من 6 أرقام إلى حسابك في تيليجرام.</p>
+                </div>
+                
+                <Input 
+                  placeholder="000000" 
+                  value={otp} 
+                  onChange={(e) => setOtp(e.target.value)} 
+                  className="bg-white/5 border-white/20 h-14 text-center text-2xl tracking-[1em] font-black"
+                  maxLength={6}
+                />
+
+                <Button 
+                  onClick={handleVerifyOTP} 
+                  disabled={loading || otp.length < 6}
+                  className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-black font-bold"
+                >
+                  {loading ? "جاري التحقق..." : "تأكيد الرمز والدخول"}
+                </Button>
+
+                <div className="pt-4">
+                  <Button variant="link" onClick={() => window.open(`https://t.me/Garage3BOT`, "_blank")} className="text-sky-500 text-xs">
+                    لم يصلك الرمز؟ افتح البوت مرة أخرى
+                  </Button>
+                </div>
               </div>
-              <Button onClick={() => window.open(`https://t.me/Garage3BOT`, "_blank")} className="w-full bg-sky-500 hover:bg-sky-600 font-bold">
-                فتح تليجرام مرة أخرى
-              </Button>
             </div>
           ) : (
             <form onSubmit={handleInitialSubmit} className="space-y-5">

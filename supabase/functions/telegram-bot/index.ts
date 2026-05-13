@@ -26,26 +26,32 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
 
-    // 1. التعامل مع مشاركة رقم الهاتف
+    // 1. توليد رمز OTP عشوائي
+    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+
+    // 2. التعامل مع مشاركة رقم الهاتف (الطريقة الأكثر أماناً)
     if (contact) {
       const phone = contact.phone_number.replace('+', '')
       
+      // حفظ الرمز في قاعدة البيانات
       const { error } = await supabase
         .from('auth_sessions')
-        .update({ status: 'verified' })
+        .update({ 
+          otp_code: otp,
+          status: 'awaiting_otp'
+        })
         .eq('phone', phone)
-        .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      await sendTelegramMessage(chatId, "✅ تم تأكيد هويتك بنجاح! ارجع للتطبيق الآن.")
+      await sendTelegramMessage(chatId, `🔑 رمز التحقق الخاص بك هو: \n\n${otp}\n\nيرجى إدخاله في التطبيق لإتمام الدخول.`)
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
 
-    // 2. رسالة البداية
+    // 3. رسالة البداية
     if (text?.startsWith('/start')) {
-      await sendTelegramMessage(chatId, "🛡️ مرحباً بك في مرآب أوباما.\n\nيرجى الضغط على الزر أدناه لتأكيد رقم هاتفك والدخول للتطبيق بأمان.", {
-        keyboard: [[{ text: "📲 تأكيد هويتي الآن", request_contact: true }]],
+      await sendTelegramMessage(chatId, "🛡️ مرحباً بك في مرآب أوباما.\n\nيرجى الضغط على الزر أدناه للحصول على رمز الدخول الخاص بك.", {
+        keyboard: [[{ text: "📲 الحصول على رمز الدخول", request_contact: true }]],
         resize_keyboard: true,
         one_time_keyboard: true
       })
