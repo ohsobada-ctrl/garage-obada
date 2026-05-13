@@ -3,76 +3,85 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { 
-  MessageSquare, 
   Mail, 
-  Lock,
-  User,
-  ShieldCheck,
-  ArrowRight
+  Lock, 
+  Phone, 
+  User, 
+  ShieldCheck, 
+  Eye, 
+  EyeOff,
+  MessageSquare,
+  ChevronLeft
 } from "lucide-react";
 
+type AuthMode = "login" | "signup" | "forgot" | "verify_method" | "otp_input";
+
 export default function Auth() {
-  const [mode, setMode] = useState<"login" | "signup" | "otp">("login");
-  const [identifier, setIdentifier] = useState("");
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
+  const [otpTarget, setOtpTarget] = useState<"telegram" | "email" | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Form states
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [otp, setOtp] = useState("");
-  const [otpMethod, setOtpMethod] = useState<"telegram" | "email" | null>(null);
+  
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const cleanPhone = (val: string) => val.replace(/\D/g, "");
 
-  // تسجيل الدخول العادي (كلمة سر)
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const isEmail = identifier.includes("@");
       const { error } = await supabase.auth.signInWithPassword({
-        email: isEmail ? identifier.toLowerCase() : undefined,
-        phone: !isEmail ? cleanPhone(identifier) : undefined,
-        password: password,
+        email: loginMethod === "email" ? email : undefined,
+        phone: loginMethod === "phone" ? cleanPhone(phoneNumber) : undefined,
+        password,
       });
-
-      if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          throw new Error("بيانات الدخول غير صحيحة، أو الحساب غير موجود.");
-        }
-        throw error;
-      }
-
+      if (error) throw error;
+      toast.success("تم تسجيل الدخول بنجاح");
       navigate("/");
-      window.location.reload();
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error("خطأ في تسجيل الدخول: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // إرسال كود OTP
-  const handleSendOTP = async (method: "telegram" | "email") => {
+  const handleInitiateVerification = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode === "signup" && password !== confirmPassword) {
+      toast.error("كلمات المرور غير متطابقة");
+      return;
+    }
+    setMode("verify_method");
+  };
+
+  const sendOTP = async (method: "telegram" | "email") => {
+    setOtpTarget(method);
     setLoading(true);
     try {
-      setOtpMethod(method);
       if (method === "telegram") {
-        const phone = cleanPhone(identifier);
+        const phone = cleanPhone(phoneNumber);
         if (!phone) throw new Error("يرجى إدخال رقم الهاتف أولاً");
-        
         await supabase.from('auth_sessions').upsert({ phone, status: 'pending' }, { onConflict: 'phone' });
         window.open(`https://t.me/Garage3BOT`, "_blank");
         toast.info("يرجى الحصول على الرمز من البوت");
       } else {
-        const { error } = await supabase.auth.signInWithOtp({ email: identifier.toLowerCase() });
+        const { error } = await supabase.auth.signInWithOtp({ email: email.toLowerCase() });
         if (error) throw error;
-        toast.success("تم إرسال الرمز للإيميل");
+        toast.success("تم إرسال الرمز للبريد الإلكتروني");
       }
-      setMode("otp");
+      setMode("otp_input");
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -80,12 +89,11 @@ export default function Auth() {
     }
   };
 
-  // التحقق من OTP
-  const handleVerifyOTP = async () => {
+  const verifyAndFinish = async () => {
     setLoading(true);
     try {
-      if (otpMethod === "telegram") {
-        const phone = cleanPhone(identifier);
+      if (otpTarget === "telegram") {
+        const phone = cleanPhone(phoneNumber);
         const { data, error } = await supabase
           .from('auth_sessions')
           .select('*')
@@ -96,23 +104,25 @@ export default function Auth() {
 
         if (error || !data) throw new Error("الرمز غير صحيح.");
         
-        // جلب بيانات المستخدم
-        const { data: profile } = await supabase.from('profiles').select('*').eq('phone', phone).single();
-        if (profile) {
-          localStorage.setItem("garage_user_id", profile.id);
-          navigate("/");
-          window.location.reload();
+        // إذا كان تسجيلاً جديداً، ننشئ المستخدم فعلياً
+        if (mode === "signup" || mode === "otp_input") {
+           const { error: signUpError } = await supabase.auth.signUp({
+             email,
+             password,
+             options: { data: { full_name: fullName, phone } }
+           });
+           if (signUpError) throw signUpError;
         }
       } else {
         const { error } = await supabase.auth.verifyOtp({
-          email: identifier.toLowerCase(),
+          email: email.toLowerCase(),
           token: otp,
-          type: 'email',
+          type: mode === "forgot" ? 'recovery' : 'signup',
         });
         if (error) throw error;
-        navigate("/");
-        window.location.reload();
       }
+      toast.success("تم التحقق بنجاح!");
+      navigate("/");
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -121,102 +131,122 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.05),transparent_50%)]" />
+    <div className="min-h-screen bg-[#000000] text-white flex flex-col items-center justify-center p-6 font-sans antialiased" dir="rtl">
       
-      <Card className="w-full max-w-md border-white/5 bg-white/[0.02] backdrop-blur-3xl text-white shadow-2xl relative z-10 border-t-amber-500/50">
-        <CardHeader className="text-center space-y-2 pt-8">
-          <div className="mx-auto w-16 h-16 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20 mb-4">
-            <ShieldCheck className="h-8 w-8 text-black" />
+      {/* Header Section */}
+      <div className="w-full max-w-md flex flex-col items-center mb-8">
+        <div className="w-20 h-20 bg-[#F59E0B] rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/10 mb-6">
+          <ShieldCheck className="h-10 w-10 text-black" strokeWidth={2.5} />
+        </div>
+        <h1 className="text-3xl font-black mb-2">
+          {mode === "login" ? "تسجيل الدخول" : mode === "signup" ? "إنشاء حساب" : mode === "forgot" ? "استعادة الحساب" : "تحقق من الهوية"}
+        </h1>
+        <p className="text-gray-500 text-sm text-center">
+          {mode === "login" ? "مرحباً بك في Garage، يرجى تسجيل الدخول لمتابعة" : "يرجى إكمال الخطوات لتأمين حسابك"}
+        </p>
+      </div>
+
+      <div className="w-full max-w-md">
+        {/* Login Tabs */}
+        {mode === "login" && (
+          <div className="flex border-b border-white/10 mb-8">
+            <button onClick={() => setLoginMethod("email")} className={`flex-1 py-4 text-center font-bold relative ${loginMethod === "email" ? "text-[#F59E0B]" : "text-gray-500"}`}>
+              البريد الإلكتروني
+              {loginMethod === "email" && <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#F59E0B]" />}
+            </button>
+            <button onClick={() => setLoginMethod("phone")} className={`flex-1 py-4 text-center font-bold relative ${loginMethod === "phone" ? "text-[#F59E0B]" : "text-gray-500"}`}>
+              رقم الهاتف
+              {loginMethod === "phone" && <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#F59E0B]" />}
+            </button>
           </div>
-          <CardTitle className="text-2xl font-black tracking-tight">
-            {mode === "login" ? "تسجيل الدخول" : mode === "signup" ? "إنشاء حساب" : "التحقق من الرمز"}
-          </CardTitle>
-          <CardDescription className="text-gray-500 text-sm">
-            {mode === "otp" ? `أدخل الرمز المرسل إلى ${identifier}` : "مرحباً بك في نظام إدارة المرآب الذكي"}
-          </CardDescription>
-        </CardHeader>
+        )}
 
-        <CardContent className="space-y-6 pt-4">
-          {mode !== "otp" ? (
-            <form onSubmit={handlePasswordLogin} className="space-y-4">
-              {mode === "signup" && (
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-gray-500 uppercase">الاسم الكامل</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3.5 h-5 w-5 text-gray-600" />
-                    <Input placeholder="أدخل اسمك" value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-white/5 border-white/10 h-12 pl-10" required />
-                  </div>
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-gray-500 uppercase">الإيميل أو الهاتف</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3.5 h-5 w-5 text-gray-600" />
-                  <Input placeholder="example@mail.com" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="bg-white/5 border-white/10 h-12 pl-10" required />
-                </div>
+        <form onSubmit={mode === "login" ? handleLogin : handleInitiateVerification} className="space-y-4">
+          
+          {/* Login Fields */}
+          {mode === "login" && (
+            <>
+              <div className="relative">
+                {loginMethod === "email" ? <Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /> : <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />}
+                <Input 
+                  placeholder={loginMethod === "email" ? "example@mail.com" : "05xxxxxxxxx"} 
+                  value={loginMethod === "email" ? email : phoneNumber}
+                  onChange={(e) => loginMethod === "email" ? setEmail(e.target.value) : setPhoneNumber(e.target.value)}
+                  className="bg-[#111111] border-none h-14 pr-12 rounded-xl focus:ring-1 focus:ring-[#F59E0B]" required 
+                />
               </div>
+              <div className="relative">
+                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Input type={showPassword ? "text" : "password"} placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 pl-12 rounded-xl focus:ring-1 focus:ring-[#F59E0B]" required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">{showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
+              </div>
+              <button type="button" onClick={() => setMode("forgot")} className="text-[#F59E0B] text-sm font-bold hover:underline">نسيت كلمة المرور؟</button>
+              <Button type="submit" disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">تسجيل الدخول</Button>
+            </>
+          )}
 
-              {mode !== "otp" && (
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-gray-500 uppercase">كلمة السر</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3.5 h-5 w-5 text-gray-600" />
-                    <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-white/5 border-white/10 h-12 pl-10" required />
-                  </div>
-                </div>
-              )}
+          {/* Signup Fields */}
+          {mode === "signup" && (
+            <>
+              <div className="relative"><User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /><Input placeholder="الاسم الكامل" value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required /></div>
+              <div className="relative"><Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /><Input placeholder="البريد الإلكتروني" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required /></div>
+              <div className="relative"><Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /><Input placeholder="رقم الهاتف" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required /></div>
+              <div className="relative"><Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /><Input type="password" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required /></div>
+              <div className="relative"><Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /><Input type="password" placeholder="تأكيد كلمة المرور" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required /></div>
+              <Button type="submit" className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">إنشاء حساب</Button>
+            </>
+          )}
 
-              <Button type="submit" disabled={loading} className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-black font-bold text-md rounded-xl shadow-lg shadow-amber-500/10">
-                {loading ? "جاري المعالجة..." : mode === "login" ? "دخول" : "إنشاء حساب"}
+          {/* Verification Method Selection */}
+          {mode === "verify_method" && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pt-4">
+              <p className="text-center text-gray-400 mb-6">اختر وسيلة استلام رمز التحقق</p>
+              <Button type="button" onClick={() => sendOTP("telegram")} className="w-full h-16 bg-[#111111] hover:bg-[#1a1a1a] border border-white/5 rounded-2xl flex items-center justify-between px-6 group transition-all hover:border-sky-500/50">
+                <div className="flex items-center gap-4"><MessageSquare className="h-6 w-6 text-sky-500" /><span className="font-bold">تيليجرام</span></div>
+                <ArrowRight className="h-5 w-5 text-gray-700 group-hover:text-sky-500" />
               </Button>
-
-              {mode === "login" && (
-                <div className="relative py-4">
-                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/5"></span></div>
-                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-[#0d0d0d] px-2 text-gray-600">أو عبر كود التحقق</span></div>
-                </div>
-              )}
-
-              {mode === "login" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <Button type="button" variant="outline" onClick={() => handleSendOTP("telegram")} className="border-white/10 bg-white/5 hover:bg-sky-500/10 hover:border-sky-500/50 h-12 font-bold text-xs gap-2">
-                    <MessageSquare className="h-4 w-4 text-sky-400" /> تيليجرام
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => handleSendOTP("email")} className="border-white/10 bg-white/5 hover:bg-amber-500/10 hover:border-amber-500/50 h-12 font-bold text-xs gap-2">
-                    <Mail className="h-4 w-4 text-amber-400" /> الإيميل
-                  </Button>
-                </div>
-              )}
-            </form>
-          ) : (
-            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-              <Input 
-                placeholder="000000" 
-                value={otp} 
-                onChange={(e) => setOtp(e.target.value)} 
-                className="bg-white/5 border-white/20 h-16 text-center text-3xl tracking-[0.5em] font-black focus:border-amber-500 rounded-xl"
-                maxLength={6}
-              />
-              <Button onClick={handleVerifyOTP} disabled={loading} className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-black font-bold text-md rounded-xl">
-                {loading ? "جاري التحقق..." : "تأكيد الرمز"}
+              <Button type="button" onClick={() => sendOTP("email")} className="w-full h-16 bg-[#111111] hover:bg-[#1a1a1a] border border-white/5 rounded-2xl flex items-center justify-between px-6 group transition-all hover:border-amber-500/50">
+                <div className="flex items-center gap-4"><Mail className="h-6 w-6 text-amber-500" /><span className="font-bold">البريد الإلكتروني</span></div>
+                <ArrowRight className="h-5 w-5 text-gray-700 group-hover:text-amber-500" />
               </Button>
-              <Button variant="link" onClick={() => setMode("login")} className="w-full text-gray-500 text-xs">العودة لتسجيل الدخول</Button>
+              <button type="button" onClick={() => setMode("signup")} className="flex items-center gap-2 text-sm text-gray-500 hover:text-white mx-auto pt-4 transition-colors"><ChevronLeft className="h-4 w-4" /> العودة للتسجيل</button>
             </div>
           )}
-        </CardContent>
 
-        <CardFooter className="flex flex-col gap-4 pb-8 border-t border-white/5 pt-6 bg-white/[0.01]">
-          <button 
-            onClick={() => setMode(mode === "login" ? "signup" : "login")} 
-            className="text-sm text-gray-500 hover:text-amber-500 flex items-center gap-2 transition-colors"
-          >
-            {mode === "login" ? "ليس لديك حساب؟ سجل الآن" : "بالفعل لديك حساب؟ سجل دخولك"}
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </CardFooter>
-      </Card>
+          {/* OTP Input Field */}
+          {mode === "otp_input" && (
+            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+              <div className="text-center"><p className="text-gray-400 text-sm mb-2">أدخل رمز التحقق</p><p className="font-bold text-[#F59E0B]">{otpTarget === "telegram" ? phoneNumber : email}</p></div>
+              <Input placeholder="000000" value={otp} onChange={(e) => setOtp(e.target.value)} className="bg-[#111111] border-none h-16 text-center text-3xl tracking-[0.5em] font-black rounded-xl" maxLength={6} />
+              <Button onClick={verifyAndFinish} disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl">تأكيد الرمز</Button>
+              <Button variant="link" onClick={() => setMode("verify_method")} className="w-full text-gray-500 text-xs italic">تغيير وسيلة التحقق</Button>
+            </div>
+          )}
+
+          {/* Forgot Password View */}
+          {mode === "forgot" && (
+            <div className="space-y-4">
+               <div className="relative"><Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /><Input placeholder="البريد الإلكتروني أو الهاتف" value={identifier} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required /></div>
+               <Button onClick={() => setMode("verify_method")} className="w-full h-14 bg-[#F59E0B] text-black font-black text-lg rounded-xl">متابعة</Button>
+               <Button variant="link" onClick={() => setMode("login")} className="w-full text-gray-500 text-xs">العودة لتسجيل الدخول</Button>
+            </div>
+          )}
+
+          {/* Switch Mode Button */}
+          {mode === "login" && (
+            <div className="text-center pt-6">
+              <div className="relative py-4 mb-2"><div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/5"></span></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-black px-4 text-gray-500 font-bold">أو</span></div></div>
+              <button type="button" onClick={() => setMode("signup")} className="text-[#F59E0B] font-bold hover:underline">إنشاء حساب</button>
+            </div>
+          )}
+          {mode === "signup" && (
+            <div className="text-center pt-6">
+              <button type="button" onClick={() => setMode("login")} className="text-gray-500 text-sm">لديك حساب بالفعل؟ <span className="text-[#F59E0B] font-bold hover:underline">تسجيل الدخول</span></button>
+            </div>
+          )}
+
+        </form>
+      </div>
     </div>
   );
 }

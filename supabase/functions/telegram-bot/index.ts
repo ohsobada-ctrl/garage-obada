@@ -50,13 +50,13 @@ Deno.serve(async (req: Request) => {
         throw error
       }
 
-      await sendTelegramMessage(chatId, `🔑 رمز التحقق الخاص بك لمرآب أوباما هو: \n\n ${otp} \n\n يرجى إدخاله في التطبيق لإتمام الدخول.`)
+      await sendTelegramMessage(chatId, `🔑 رمز التحقق الخاص بك لـ Garage هو: \n\n ${otp} \n\n يرجى إدخاله في التطبيق لإتمام الدخول.`)
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
 
     // 3. رسالة البداية
     if (text?.startsWith('/start')) {
-      await sendTelegramMessage(chatId, "🛡️ مرحباً بك في مرآب أوباما.\n\nيرجى الضغط على الزر أدناه للحصول على رمز الدخول الخاص بك.", {
+      await sendTelegramMessage(chatId, "🛡️ مرحباً بك في Garage.\n\nيرجى الضغط على الزر أدناه للحصول على رمز الدخول الخاص بك.", {
         keyboard: [[{ text: "📲 الحصول على رمز الدخول", request_contact: true }]],
         resize_keyboard: true,
         one_time_keyboard: true
