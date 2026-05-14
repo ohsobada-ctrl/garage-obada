@@ -33,6 +33,7 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [otp, setOtp] = useState("");
+  const [identifier, setIdentifier] = useState("");
   
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -188,7 +189,7 @@ export default function Auth() {
               {loginMethod === "phone" && (
                 <Button 
                   type="button" 
-                  onClick={() => handleSendOTP("telegram")} 
+                  onClick={() => sendOTP("telegram")} 
                   className="w-full h-14 bg-sky-500 hover:bg-sky-600 text-white font-bold text-md rounded-xl flex items-center justify-center gap-2 mt-2"
                 >
                   <MessageSquare className="h-5 w-5" />
@@ -239,7 +240,7 @@ export default function Auth() {
           {/* Forgot Password View */}
           {mode === "forgot" && (
             <div className="space-y-4">
-               <div className="relative"><Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /><Input placeholder="البريد الإلكتروني أو الهاتف" value={identifier} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required /></div>
+               <div className="relative"><Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" /><Input placeholder="البريد الإلكتروني أو الهاتف" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required /></div>
                <Button onClick={() => setMode("verify_method")} className="w-full h-14 bg-[#F59E0B] text-black font-black text-lg rounded-xl">متابعة</Button>
                <Button variant="link" onClick={() => setMode("login")} className="w-full text-gray-500 text-xs">العودة لتسجيل الدخول</Button>
             </div>
