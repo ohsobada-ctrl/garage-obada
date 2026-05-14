@@ -61,10 +61,36 @@ export default function Auth() {
 
   const handleInitiateVerification = (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === "signup" && password !== confirmPassword) {
-      toast.error("كلمات المرور غير متطابقة");
+    
+    // 1. الأساسيات
+    if (mode === "signup") {
+      if (fullName.trim().length < 3) {
+        toast.error("يرجى إدخال اسم كامل صحيح");
+        return;
+      }
+      if (!email.includes("@") || !email.includes(".")) {
+        toast.error("يرجى إدخال بريد إلكتروني صحيح");
+        return;
+      }
+      if (password.length < 8) {
+        toast.error("كلمة المرور يجب أن تكون 8 خانات على الأقل");
+        return;
+      }
+      if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        toast.error("كلمة المرور يجب أن تحتوي على حرف كبير ورقم واحد على الأقل");
+        return;
+      }
+      if (password !== confirmPassword) {
+        toast.error("كلمات المرور غير متطابقة");
+        return;
+      }
+    }
+    
+    if (mode === "forgot" && !identifier) {
+      toast.error("يرجى إدخال البريد الإلكتروني أو الهاتف");
       return;
     }
+
     setMode("verify_method");
   };
 

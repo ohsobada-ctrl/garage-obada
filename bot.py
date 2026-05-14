@@ -12,8 +12,25 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 bot = telebot.TeleBot(TOKEN)
 
+def check_pending_session(phone):
+    """التحقق مما إذا كان هذا الرقم قد بدأ عملية التحقق من التطبيق فعلاً"""
+    url = f"{SUPABASE_URL}/rest/v1/auth_sessions?phone=eq.{phone}&status=eq.pending"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return len(data) > 0
+    except Exception as e:
+        print(f"❌ Error checking session: {e}")
+        return False
+
 def upsert_to_supabase(phone, otp):
-    url = f"{SUPABASE_URL}/rest/v1/auth_sessions"
+    """تحديث الجلسة بالرمز الجديد وتغيير الحالة إلى انتظار الإدخال"""
+    url = f"{SUPABASE_URL}/rest/v1/auth_sessions?on_conflict=phone"
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -33,29 +50,38 @@ def upsert_to_supabase(phone, otp):
         print(f"❌ Error updating Supabase: {e}")
         return False
 
-print("🚀 Garage Bot is starting (Light Version)...")
+print("🚀 Garage Bot (Secure Edition) is starting...")
 
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    button = types.KeyboardButton("📲 الحصول على رمز الدخول", request_contact=True)
+    button = types.KeyboardButton("📲 مشاركة رقم الهاتف للتحقق", request_contact=True)
     markup.add(button)
     
     bot.send_message(
         message.chat.id, 
-        "🛡️ مرحباً بك في Garage.\n\nيرجى الضغط على الزر أدناه للحصول على رمز الدخول الخاص بك.", 
+        "🛡️ مرحباً بك في Garage.\n\nمن أجل تأمين حسابك، يرجى الضغط على الزر أدناه لمشاركة رقم هاتفك وإصدار رمز الدخول الخاص بك.", 
         reply_markup=markup
     )
 
 @bot.message_handler(content_types=['contact'])
 def contact_handler(message):
+    # التأكد أن الرقم يخص نفس الشخص صاحب الحساب
     if message.contact.user_id != message.from_user.id:
-        bot.send_message(message.chat.id, "⚠️ عذراً، يجب مشاركة رقم هاتفك الشخصي.")
+        bot.send_message(message.chat.id, "⚠️ عذراً، يجب مشاركة رقم هاتفك الشخصي المرتبط بهذا الحساب.")
         return
 
     phone = message.contact.phone_number.replace('+', '')
-    otp = str(random.randint(100000, 999999))
     
+    # التأكد أن المستخدم طلب الكود من التطبيق أولاً
+    if not check_pending_session(phone):
+        bot.send_message(
+            message.chat.id, 
+            "⚠️ لم نجد طلباً نشطاً لهذا الرقم.\n\nيرجى فتح تطبيق Garage أولاً والبدء في عملية التسجيل/الدخول ثم العودة هنا."
+        )
+        return
+
+    otp = str(random.randint(100000, 999999))
     print(f"Generating OTP {otp} for phone {phone}")
     
     if upsert_to_supabase(phone, otp):
