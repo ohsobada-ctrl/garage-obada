@@ -40,26 +40,39 @@ export default function Auth() {
 
   const cleanPhone = (val: string) => {
     let cleaned = val.replace(/\D/g, "");
+    if (!cleaned) return "";
     // إذا بدأ بـ 0، نحذفه ونضيف رمز ليبيا
     if (cleaned.startsWith("0")) cleaned = "218" + cleaned.substring(1);
-    // إذا لم يبدأ بـ 218، نفترض أنه رقم ليبي ونضيف الرمز
-    else if (!cleaned.startsWith("218") && cleaned.length >= 9) cleaned = "218" + cleaned;
+    // إذا كان الرقم قصيراً (مثلاً 91xxxxxxx) بدون 218 وبدون 0
+    else if (!cleaned.startsWith("218") && cleaned.length >= 8 && cleaned.length <= 10) cleaned = "218" + cleaned;
     return cleaned;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const targetEmail = loginMethod === "email" ? email : undefined;
+    const targetPhone = loginMethod === "phone" ? cleanPhone(phoneNumber) : undefined;
+
+    if (loginMethod === "email" && !email) {
+      toast.error("يرجى إدخال البريد الإلكتروني");
+      return;
+    }
+    if (loginMethod === "phone" && !targetPhone) {
+      toast.error("يرجى إدخال رقم هاتف صحيح");
+      return;
+    }
+
     setLoading(true);
     try {
-      const p = loginMethod === "phone" ? cleanPhone(phoneNumber) : undefined;
       const { error } = await supabase.auth.signInWithPassword({
-        email: loginMethod === "email" ? email : undefined,
-        phone: p,
+        email: targetEmail,
+        phone: targetPhone,
         password,
       });
       if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          throw new Error("البريد/الهاتف أو كلمة المرور غير صحيحة. تأكد من البيانات أو أنك تملك حساباً.");
+        if (error.message.includes("Invalid login credentials") || error.message.includes("missing email or phone")) {
+          throw new Error("بيانات الدخول غير صحيحة. تأكد من الرقم وكلمة المرور.");
         }
         throw error;
       }
@@ -145,22 +158,37 @@ export default function Auth() {
 
         if (error || !data) throw new Error("الرمز غير صحيح أو انتهت صلاحيته.");
         
+        // التحقق من وجود الإيميل والباسوورد
+        if (!email || !password) {
+          if (mode === "signup" || mode === "login") {
+            throw new Error("يرجى التأكد من إدخال البريد الإلكتروني وكلمة المرور أولاً.");
+          }
+        }
+
         // إذا كانت عملية استعادة كلمة مرور
         if (mode === "forgot") {
-          const { error: resetError } = await supabase.auth.updateUser({ password });
-          if (resetError) throw resetError;
-          toast.success("تم تحديث كلمة المرور بنجاح!");
+          // ملاحظة: استعادة الباسوورد عبر تيليجرام تتطلب منطقاً خاصاً في الـ Edge Function 
+          // حالياً سنوجه المستخدم لتسجيل الدخول إذا كان يعرف الباسوورد أو استخدام الإيميل
+          throw new Error("استعادة كلمة المرور عبر تيليجرام قيد التطوير، يرجى استخدام البريد الإلكتروني حالياً أو التواصل مع الدعم.");
         } else {
-          // إذا كان تسجيلاً جديداً
-          const { error: signUpError } = await supabase.auth.signUp({
+          // محاولة تسجيل الدخول أولاً (إذا كان الحساب موجوداً)
+          const { error: signInError } = await supabase.auth.signInWithPassword({
             email,
             password,
-            options: { data: { full_name: fullName, phone } }
           });
-          if (signUpError) throw signUpError;
+
+          // إذا لم ينجح الدخول (الحساب غير موجود)، نقوم بإنشائه
+          if (signInError) {
+            const { error: signUpError } = await supabase.auth.signUp({
+              email,
+              password,
+              options: { data: { full_name: fullName, phone } }
+            });
+            if (signUpError) throw signUpError;
+          }
         }
       } else {
-        // التحقق من كود الإيميل
+        // التحقق من كود الإيميل (نظام Supabase الأصلي)
         const { error } = await supabase.auth.verifyOtp({
           email: identifier.toLowerCase() || email.toLowerCase(),
           token: otp,
