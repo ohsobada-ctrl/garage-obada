@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.auth_sessions (
     phone TEXT PRIMARY KEY,
     otp_code TEXT,
     status TEXT DEFAULT 'pending',
+    chat_id BIGINT,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
