@@ -38,22 +38,35 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const cleanPhone = (val: string) => val.replace(/\D/g, "");
+  const cleanPhone = (val: string) => {
+    let cleaned = val.replace(/\D/g, "");
+    // إذا بدأ بـ 0، نحذفه ونضيف رمز ليبيا
+    if (cleaned.startsWith("0")) cleaned = "218" + cleaned.substring(1);
+    // إذا لم يبدأ بـ 218، نفترض أنه رقم ليبي ونضيف الرمز
+    else if (!cleaned.startsWith("218") && cleaned.length >= 9) cleaned = "218" + cleaned;
+    return cleaned;
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
+      const p = loginMethod === "phone" ? cleanPhone(phoneNumber) : undefined;
       const { error } = await supabase.auth.signInWithPassword({
         email: loginMethod === "email" ? email : undefined,
-        phone: loginMethod === "phone" ? cleanPhone(phoneNumber) : undefined,
+        phone: p,
         password,
       });
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          throw new Error("البريد/الهاتف أو كلمة المرور غير صحيحة. تأكد من البيانات أو أنك تملك حساباً.");
+        }
+        throw error;
+      }
       toast.success("تم تسجيل الدخول بنجاح");
       navigate("/");
     } catch (error: any) {
-      toast.error("خطأ في تسجيل الدخول: " + error.message);
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
@@ -62,7 +75,6 @@ export default function Auth() {
   const handleInitiateVerification = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 1. الأساسيات
     if (mode === "signup") {
       if (fullName.trim().length < 3) {
         toast.error("يرجى إدخال اسم كامل صحيح");
@@ -100,12 +112,13 @@ export default function Auth() {
     try {
       if (method === "telegram") {
         const phone = cleanPhone(phoneNumber || identifier);
-        if (!phone) throw new Error("يرجى إدخال رقم الهاتف أولاً");
+        if (!phone || phone.length < 5) throw new Error("يرجى إدخال رقم الهاتف أولاً");
         await supabase.from('auth_sessions').upsert({ phone, status: 'pending' }, { onConflict: 'phone' });
         window.open(`https://t.me/Garage3BOT`, "_blank");
         toast.info("يرجى الحصول على الرمز من البوت");
       } else {
-        const { error } = await supabase.auth.signInWithOtp({ email: email.toLowerCase() });
+        const target = identifier || email;
+        const { error } = await supabase.auth.signInWithOtp({ email: target.toLowerCase() });
         if (error) throw error;
         toast.success("تم إرسال الرمز للبريد الإلكتروني");
       }
@@ -130,16 +143,21 @@ export default function Auth() {
           .eq('status', 'awaiting_otp')
           .single();
 
-        if (error || !data) throw new Error("الرمز غير صحيح.");
+        if (error || !data) throw new Error("الرمز غير صحيح أو انتهت صلاحيته.");
         
-        // إذا كان تسجيلاً جديداً، ننشئ المستخدم فعلياً
-        if (mode === "signup" || mode === "otp_input") {
-           const { error: signUpError } = await supabase.auth.signUp({
-             email,
-             password,
-             options: { data: { full_name: fullName, phone } }
-           });
-           if (signUpError) throw signUpError;
+        // إذا كانت عملية استعادة كلمة مرور
+        if (mode === "forgot") {
+          const { error: resetError } = await supabase.auth.updateUser({ password });
+          if (resetError) throw resetError;
+          toast.success("تم تحديث كلمة المرور بنجاح!");
+        } else {
+          // إذا كان تسجيلاً جديداً
+          const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: fullName, phone } }
+          });
+          if (signUpError) throw signUpError;
         }
       } else {
         // التحقق من كود الإيميل
@@ -150,7 +168,7 @@ export default function Auth() {
         });
         if (error) throw error;
       }
-      toast.success("تم التحقق بنجاح!");
+      toast.success("تمت العملية بنجاح!");
       navigate("/");
     } catch (error: any) {
       toast.error(error.message);
