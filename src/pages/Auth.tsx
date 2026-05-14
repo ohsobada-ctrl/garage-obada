@@ -145,13 +145,12 @@ export default function Auth() {
 
   const verifyAndFinish = async () => {
     setLoading(true);
-    console.log("🚀 Starting verification for mode:", mode, "Target:", otpTarget);
     try {
       if (otpTarget === "telegram") {
         const phone = cleanPhone(phoneNumber || identifier);
-        console.log("🔍 Checking OTP for phone:", phone, "OTP:", otp);
         
-        const { data, error } = await supabase
+        // 1. التحقق من الرمز في قاعدة البيانات
+        const { data, error: sessionError } = await supabase
           .from('auth_sessions')
           .select('*')
           .eq('phone', phone)
@@ -159,33 +158,31 @@ export default function Auth() {
           .eq('status', 'awaiting_otp')
           .single();
 
-        if (error || !data) {
-          console.error("❌ OTP verification failed:", error);
-          throw new Error("الرمز غير صحيح أو انتهت صلاحيته. يرجى التأكد من الكود المرسل من البوت.");
+        if (sessionError || !data) {
+          throw new Error("الرمز غير صحيح. تأكد من إدخال آخر رمز أرسله البوت.");
         }
         
-        console.log("✅ OTP verified successfully!");
-
+        // 2. التحقق من البيانات الأساسية
         const currentPhone = cleanPhone(phoneNumber || identifier);
-        
-        if (mode === "signup" || mode === "login" || mode === "otp_input") {
-          if (!password) throw new Error("يرجى إدخال كلمة المرور أولاً.");
-          if (!email && !currentPhone) throw new Error("يرجى إدخال البريد الإلكتروني أو رقم الهاتف.");
-        }
+        if (!password) throw new Error("كلمة المرور مفقودة.");
+        if (!email && !currentPhone) throw new Error("البريد أو الهاتف مفقود.");
 
-        if (mode === "forgot") {
-          throw new Error("استعادة كلمة المرور عبر تيليجرام قيد التطوير، يرجى استخدام البريد حالياً.");
-        } else {
-          console.log("🔐 Attempting to sign in/up with:", email || currentPhone);
-          
-          const loginParams: any = { password };
-          if (email) loginParams.email = email;
-          else if (currentPhone) loginParams.phone = currentPhone;
+        // 3. محاولة تسجيل الدخول أو الإنشاء
+        const authParams: any = { password };
+        if (email) authParams.email = email;
+        else authParams.phone = currentPhone;
 
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword(loginParams);
+        // نحاول الدخول أولاً
+        const { error: signInError } = await supabase.auth.signInWithPassword(authParams);
 
-          if (signInError) {
-            console.log("ℹ️ SignIn failed, attempting SignUp:", signInError.message);
+        if (signInError) {
+          // إذا كان الخطأ هو "تجاوز الحد"، نتوقف فوراً
+          if (signInError.message.includes("rate limit")) {
+            throw new Error("لقد تجاوزت حد المحاولات المسموح به. يرجى الانتظار قليلاً أو استخدام بريد إلكتروني مختلف.");
+          }
+
+          // إذا لم يكن الحساب موجوداً، نقوم بإنشائه
+          if (signInError.message.includes("Invalid login credentials") || signInError.message.includes("does not exist")) {
             const signUpParams: any = { 
               password,
               options: { data: { full_name: fullName, phone: currentPhone } }
@@ -194,17 +191,20 @@ export default function Auth() {
             else if (currentPhone) signUpParams.phone = currentPhone;
 
             const { error: signUpError } = await supabase.auth.signUp(signUpParams);
+            
             if (signUpError) {
-               console.error("❌ SignUp failed:", signUpError);
-               throw new Error(`فشل إنشاء الحساب: ${signUpError.message}`);
+              if (signUpError.message.includes("rate limit")) {
+                throw new Error("فشل التسجيل: تم تجاوز حد المحاولات. انتظر قليلاً.");
+              }
+              throw signUpError;
             }
-            console.log("✅ SignUp successful!");
           } else {
-            console.log("✅ SignIn successful!");
+            // خطأ آخر في الدخول (مثل كلمة مرور خاطئة لحساب موجود)
+            throw new Error(`خطأ في الدخول: ${signInError.message}`);
           }
         }
       } else {
-        console.log("🔍 Verifying Email OTP...");
+        // التحقق من كود الإيميل
         const { error } = await supabase.auth.verifyOtp({
           email: identifier.toLowerCase() || email.toLowerCase(),
           token: otp,
