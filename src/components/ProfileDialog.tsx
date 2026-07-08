@@ -123,7 +123,6 @@ export function ProfileDialog() {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="9x xxx xxxx"
                 className="text-right"
-                disabled // Phone is usually managed via Auth
               />
             </div>
             <div className="space-y-2">

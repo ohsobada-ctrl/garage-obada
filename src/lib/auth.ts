@@ -4,6 +4,7 @@ export type CustomUser = {
   uid: string;
   phoneNumber?: string;
   phone?: string;
+  email?: string;
 };
 
 export type AuthState = {
