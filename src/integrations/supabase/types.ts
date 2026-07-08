@@ -62,6 +62,30 @@ export type Database = {
         }
         Relationships: []
       }
+      otp_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          email: string | null
+          id: string
+          phone: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          phone?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -91,7 +115,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      send_sms_via_twilio: {
+        Args: { message_text: string; to_phone: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

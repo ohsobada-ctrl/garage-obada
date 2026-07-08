@@ -73,7 +73,7 @@ export function ProfileDialog() {
         <button className="flex items-center gap-3 text-right hover:opacity-80 transition-opacity">
           <div className="hidden sm:block">
             <p className="text-xs text-muted-foreground">الملف الشخصي</p>
-            <p className="text-sm font-bold truncate max-w-[100px]">{fullName || user?.email?.split('@')[0] || 'مستخدم'}</p>
+            <p className="text-sm font-bold truncate max-w-[100px]">{fullName || user?.phoneNumber || user?.phone || 'مستخدم'}</p>
           </div>
           <Avatar className="w-10 h-10 border-2 border-primary/20">
             <AvatarImage src={avatarUrl} />
@@ -96,7 +96,7 @@ export function ProfileDialog() {
             <Avatar className="w-24 h-24 border-4 border-secondary shadow-xl">
               <AvatarImage src={avatarUrl} />
               <AvatarFallback className="bg-secondary text-secondary-foreground text-3xl">
-                {fullName?.charAt(0) || user?.email?.charAt(0) || "?"}
+                {fullName?.charAt(0) || user?.phoneNumber?.charAt(0) || "?"}
               </AvatarFallback>
             </Avatar>
             <Button size="icon" variant="secondary" className="absolute bottom-0 right-0 rounded-full shadow-lg border border-border">
