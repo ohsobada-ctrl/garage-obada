@@ -47,7 +47,7 @@ export const NotificationService = {
             id: Math.floor(Math.random() * 100000),
             schedule: { at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) }, // 30 days
             sound: 'default',
-            smallIcon: 'res://drawable/ic_stat_name', // Good practice for Android
+            channelId: 'maintenance-alerts',
             actionTypeId: "MAINTENANCE_REMINDER",
           }
         ]
@@ -60,11 +60,23 @@ export const NotificationService = {
   async createChannel() {
     try {
       if (Capacitor.getPlatform() === 'android') {
+        // Create maintenance channel
         await LocalNotifications.createChannel({
           id: 'maintenance-alerts',
           name: 'تنبيهات الصيانة',
           importance: 5,
           description: 'تنبيهات هامة لمواعيد الصيانة',
+          sound: 'default',
+          visibility: 1,
+          vibration: true
+        });
+
+        // Create default channel
+        await LocalNotifications.createChannel({
+          id: 'default-channel',
+          name: 'التنبيهات العامة',
+          importance: 5,
+          description: 'تنبيهات عامة من التطبيق',
           sound: 'default',
           visibility: 1,
           vibration: true

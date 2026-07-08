@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { NotificationService } from "@/services/notificationService";
 import { AuthProvider } from "@/components/AuthProvider";
+import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/lib/auth";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -29,6 +30,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => {
   useEffect(() => {
     NotificationService.createChannel();
+    
+    // Request notification permissions on mobile startup
+    if (Capacitor.isNativePlatform()) {
+      NotificationService.requestPermissions();
+    }
   }, []);
 
   return (
