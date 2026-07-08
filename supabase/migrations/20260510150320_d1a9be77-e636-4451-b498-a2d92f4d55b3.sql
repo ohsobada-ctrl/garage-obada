@@ -1,6 +1,6 @@
 
--- Create the cars table
-CREATE TABLE public.cars (
+-- Create the cars table (idempotent)
+CREATE TABLE IF NOT EXISTS public.cars (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL,
     make TEXT NOT NULL,
@@ -20,30 +20,46 @@ CREATE TABLE public.cars (
 ALTER TABLE public.cars ENABLE ROW LEVEL SECURITY;
 
 -- Users can view their own cars
-CREATE POLICY "Users can view their own cars"
-ON public.cars
-FOR SELECT
-TO authenticated
-USING (user_id = auth.uid());
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cars' AND policyname = 'Users can view their own cars'
+  ) THEN
+    CREATE POLICY "Users can view their own cars"
+    ON public.cars FOR SELECT TO authenticated
+    USING (user_id = auth.uid());
+  END IF;
+END $$;
 
 -- Users can insert their own cars
-CREATE POLICY "Users can insert their own cars"
-ON public.cars
-FOR INSERT
-TO authenticated
-WITH CHECK (user_id = auth.uid());
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cars' AND policyname = 'Users can insert their own cars'
+  ) THEN
+    CREATE POLICY "Users can insert their own cars"
+    ON public.cars FOR INSERT TO authenticated
+    WITH CHECK (user_id = auth.uid());
+  END IF;
+END $$;
 
 -- Users can update their own cars
-CREATE POLICY "Users can update their own cars"
-ON public.cars
-FOR UPDATE
-TO authenticated
-USING (user_id = auth.uid())
-WITH CHECK (user_id = auth.uid());
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cars' AND policyname = 'Users can update their own cars'
+  ) THEN
+    CREATE POLICY "Users can update their own cars"
+    ON public.cars FOR UPDATE TO authenticated
+    USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+  END IF;
+END $$;
 
 -- Users can delete their own cars
-CREATE POLICY "Users can delete their own cars"
-ON public.cars
-FOR DELETE
-TO authenticated
-USING (user_id = auth.uid());
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cars' AND policyname = 'Users can delete their own cars'
+  ) THEN
+    CREATE POLICY "Users can delete their own cars"
+    ON public.cars FOR DELETE TO authenticated
+    USING (user_id = auth.uid());
+  END IF;
+END $$;
