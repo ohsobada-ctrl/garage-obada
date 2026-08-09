@@ -30,11 +30,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => {
   useEffect(() => {
     NotificationService.createChannel();
-    
-    // Request notification permissions on mobile startup
-    if (Capacitor.isNativePlatform()) {
-      NotificationService.requestPermissions();
-    }
+    NotificationService.requestPermissions();
   }, []);
 
   return (

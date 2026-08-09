@@ -15,7 +15,7 @@ import {
   ChevronLeft
 } from "lucide-react";
 
-type AuthMode = "login" | "signup" | "forgot" | "reset_password";
+type AuthMode = "login" | "signup" | "forgot" | "reset_password" | "verify_signup" | "verify_recovery";
 
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>("login");
@@ -30,6 +30,8 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [otpToken, setOtpToken] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -76,11 +78,23 @@ export default function Auth() {
         password,
       });
       if (error) {
+        if (error.message.includes("Email not confirmed")) {
+          toast.warning("البريد الإلكتروني لم يتم تأكيده بعد. سنرسل لك رمز تحقق جديد.");
+          await supabase.auth.resend({
+            type: "signup",
+            email: email.toLowerCase(),
+          });
+          setMode("verify_signup");
+          return;
+        }
         if (error.message.includes("Invalid login credentials") || error.message.includes("missing email or phone")) {
           throw new Error("بيانات الدخول غير صحيحة. تأكد من البريد الإلكتروني وكلمة المرور.");
         }
         throw error;
       }
+      
+      // حفظ خيار تذكرني
+      localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       toast.success("تم تسجيل الدخول بنجاح");
       navigate("/");
     } catch (error: any) {
@@ -135,11 +149,13 @@ export default function Auth() {
       }
 
       if (data?.session) {
+        localStorage.setItem("remember_me", rememberMe ? "true" : "false");
         toast.success("تم إنشاء الحساب وتسجيل الدخول بنجاح!");
         navigate("/");
       } else {
-        toast.success("تم إنشاء الحساب بنجاح! يرجى التحقق من بريدك الإلكتروني لتأكيد التسجيل.");
-        setMode("login");
+        toast.success("تم إنشاء الحساب بنجاح! يرجى إدخال رمز التحقق المكون من 6 أرقام المرسل إلى بريدك الإلكتروني.");
+        setOtpToken("");
+        setMode("verify_signup");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -161,10 +177,64 @@ export default function Auth() {
         redirectTo: `${window.location.origin}/auth`,
       });
       if (error) throw error;
-      toast.success("تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني");
-      setMode("login");
+      toast.success("تم إرسال رمز استعادة كلمة المرور إلى بريدك الإلكتروني");
+      setOtpToken("");
+      setMode("verify_recovery");
     } catch (error: any) {
       toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifySignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpToken.length !== 6) {
+      toast.error("يرجى إدخال رمز التحقق المكون من 6 أرقام");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.toLowerCase(),
+        token: otpToken,
+        type: "signup",
+      });
+
+      if (error) throw error;
+
+      localStorage.setItem("remember_me", rememberMe ? "true" : "false");
+      toast.success("تم تأكيد الحساب وتسجيل الدخول بنجاح!");
+      navigate("/");
+    } catch (error: any) {
+      toast.error(error.message || "رمز التحقق غير صحيح");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpToken.length !== 6) {
+      toast.error("يرجى إدخال رمز استعادة الحساب المكون من 6 أرقام");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.toLowerCase(),
+        token: otpToken,
+        type: "recovery",
+      });
+
+      if (error) throw error;
+
+      toast.success("تم التحقق بنجاح! يرجى إدخال كلمة المرور الجديدة.");
+      setMode("reset_password");
+    } catch (error: any) {
+      toast.error(error.message || "رمز استعادة الحساب غير صحيح");
     } finally {
       setLoading(false);
     }
@@ -204,6 +274,8 @@ export default function Auth() {
     if (mode === "login") return handleLogin(e);
     if (mode === "signup") return handleSignup(e);
     if (mode === "forgot") return handleForgotPassword(e);
+    if (mode === "verify_signup") return handleVerifySignup(e);
+    if (mode === "verify_recovery") return handleVerifyRecovery(e);
     if (mode === "reset_password") return handleResetPassword(e);
   };
 
@@ -219,12 +291,16 @@ export default function Auth() {
           {mode === "login" && "تسجيل الدخول"}
           {mode === "signup" && "إنشاء حساب"}
           {mode === "forgot" && "استعادة الحساب"}
+          {mode === "verify_signup" && "رمز التحقق للبريد"}
+          {mode === "verify_recovery" && "رمز استعادة الحساب"}
           {mode === "reset_password" && "تغيير كلمة المرور"}
         </h1>
         <p className="text-gray-500 text-sm text-center">
           {mode === "login" && "مرحباً بك في Garage، يرجى تسجيل الدخول لمتابعة"}
           {mode === "signup" && "يرجى إدخال بياناتك لإنشاء حساب جديد"}
-          {mode === "forgot" && "أدخل بريدك الإلكتروني لإرسال رابط الاستعادة"}
+          {mode === "forgot" && "أدخل بريدك الإلكتروني لإرسال رمز الاستعادة"}
+          {mode === "verify_signup" && "أدخل الرمز المكون من 6 أرقام لتأكيد حسابك"}
+          {mode === "verify_recovery" && "أدخل رمز الاستعادة المكون من 6 أرقام"}
           {mode === "reset_password" && "أدخل كلمة المرور الجديدة لتحديث حسابك"}
         </p>
       </div>
@@ -250,7 +326,20 @@ export default function Auth() {
                 <Input type={showPassword ? "text" : "password"} placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 pl-12 rounded-xl focus:ring-1 focus:ring-[#F59E0B]" required />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">{showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
               </div>
-              <button type="button" onClick={() => setMode("forgot")} className="text-[#F59E0B] text-sm font-bold hover:underline">نسيت كلمة المرور؟</button>
+              
+              <div className="flex items-center justify-between mt-2 px-1">
+                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={rememberMe} 
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded border-gray-800 bg-[#111111] text-[#F59E0B] focus:ring-0 focus:ring-offset-0 h-4 w-4 accent-[#F59E0B]" 
+                  />
+                  تذكرني
+                </label>
+                <button type="button" onClick={() => setMode("forgot")} className="text-[#F59E0B] text-sm font-bold hover:underline">نسيت كلمة المرور؟</button>
+              </div>
+
               <Button type="submit" disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">تسجيل الدخول</Button>
             </>
           )}
@@ -272,7 +361,7 @@ export default function Auth() {
               </div>
               <div className="relative">
                 <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
-                <Input type={showPassword ? "text" : "password"} placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 pl-12 rounded-xl required" required />
+                <Input type={showPassword ? "text" : "password"} placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 pl-12 rounded-xl" required />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">{showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
               </div>
               <div className="relative">
@@ -280,7 +369,76 @@ export default function Auth() {
                 <Input type={showConfirmPassword ? "text" : "password"} placeholder="تأكيد كلمة المرور" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 pl-12 rounded-xl" required />
                 <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">{showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
               </div>
+
+              <div className="flex items-center gap-2 mt-2 px-1">
+                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={rememberMe} 
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded border-gray-800 bg-[#111111] text-[#F59E0B] focus:ring-0 focus:ring-offset-0 h-4 w-4 accent-[#F59E0B]" 
+                  />
+                  تذكرني في هذا الجهاز
+                </label>
+              </div>
+
               <Button type="submit" disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">إنشاء حساب</Button>
+            </>
+          )}
+
+          {/* Verify Signup Mode */}
+          {mode === "verify_signup" && (
+            <>
+              <div className="text-center mb-4">
+                <p className="text-sm text-gray-400">
+                  لقد أرسلنا رمز التحقق المكون من 6 أرقام إلى بريدك الإلكتروني: <br />
+                  <span className="text-white font-bold">{email}</span>
+                </p>
+              </div>
+              <div className="relative">
+                <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Input 
+                  type="text" 
+                  maxLength={6}
+                  placeholder="رمز التحقق (6 أرقام)" 
+                  value={otpToken} 
+                  onChange={(e) => setOtpToken(e.target.value.replace(/\D/g, ""))} 
+                  className="bg-[#111111] border-none h-14 pr-12 text-center text-xl font-bold tracking-[0.5em] rounded-xl focus:ring-1 focus:ring-[#F59E0B]" 
+                  required 
+                />
+              </div>
+              <Button type="submit" disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">تأكيد رمز التحقق</Button>
+              <button type="button" onClick={() => setMode("signup")} className="flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-white mx-auto pt-4 transition-colors">
+                <ChevronLeft className="h-4 w-4 rotate-180" /> تعديل البريد الإلكتروني
+              </button>
+            </>
+          )}
+
+          {/* Verify Recovery Mode */}
+          {mode === "verify_recovery" && (
+            <>
+              <div className="text-center mb-4">
+                <p className="text-sm text-gray-400">
+                  لقد أرسلنا رمز استعادة الحساب المكون من 6 أرقام إلى بريدك الإلكتروني: <br />
+                  <span className="text-white font-bold">{email}</span>
+                </p>
+              </div>
+              <div className="relative">
+                <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
+                <Input 
+                  type="text" 
+                  maxLength={6}
+                  placeholder="رمز الاستعادة (6 أرقام)" 
+                  value={otpToken} 
+                  onChange={(e) => setOtpToken(e.target.value.replace(/\D/g, ""))} 
+                  className="bg-[#111111] border-none h-14 pr-12 text-center text-xl font-bold tracking-[0.5em] rounded-xl focus:ring-1 focus:ring-[#F59E0B]" 
+                  required 
+                />
+              </div>
+              <Button type="submit" disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">تأكيد رمز الاستعادة</Button>
+              <button type="button" onClick={() => setMode("forgot")} className="flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-white mx-auto pt-4 transition-colors">
+                <ChevronLeft className="h-4 w-4 rotate-180" /> تعديل البريد الإلكتروني
+              </button>
             </>
           )}
 
@@ -291,7 +449,7 @@ export default function Auth() {
                 <Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
                 <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[#111111] border-none h-14 pr-12 rounded-xl" required />
               </div>
-              <Button type="submit" disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">إرسال رابط الاستعادة</Button>
+              <Button type="submit" disabled={loading} className="w-full h-14 bg-[#F59E0B] hover:bg-amber-600 text-black font-black text-lg rounded-xl mt-4">إرسال رمز الاستعادة</Button>
               <button type="button" onClick={() => setMode("login")} className="flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-white mx-auto pt-4 transition-colors">
                 <ChevronLeft className="h-4 w-4 rotate-180" /> العودة لتسجيل الدخول
               </button>

@@ -7,8 +7,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initAuth = async () => {
+      const isSessionActive = sessionStorage.getItem("session_active") === "true";
+      const rememberMe = localStorage.getItem("remember_me") !== "false";
+
+      if (!isSessionActive && !rememberMe) {
+        // Tab was closed and reopened, and user didn't want to be remembered
+        await supabase.auth.signOut();
+        localStorage.removeItem("garage_user_phone");
+        localStorage.removeItem("garage_user_id");
+      }
+
+      sessionStorage.setItem("session_active", "true");
+
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser({
           uid: session.user.id,
@@ -20,7 +32,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
       setLoading(false);
-    });
+    };
+
+    initAuth();
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
