@@ -189,8 +189,8 @@ export default function Auth() {
 
   const handleVerifySignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpToken.length !== 6) {
-      toast.error("يرجى إدخال رمز التحقق المكون من 6 أرقام");
+    if (otpToken.length < 6 || otpToken.length > 8) {
+      toast.error("يرجى إدخال رمز التحقق المكون من 6 إلى 8 أرقام");
       return;
     }
 
@@ -216,8 +216,8 @@ export default function Auth() {
 
   const handleVerifyRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpToken.length !== 6) {
-      toast.error("يرجى إدخال رمز استعادة الحساب المكون من 6 أرقام");
+    if (otpToken.length < 6 || otpToken.length > 8) {
+      toast.error("يرجى إدخال رمز استعادة الحساب المكون من 6 إلى 8 أرقام");
       return;
     }
 
@@ -391,7 +391,7 @@ export default function Auth() {
             <>
               <div className="text-center mb-4">
                 <p className="text-sm text-gray-400">
-                  لقد أرسلنا رمز التحقق المكون من 6 أرقام إلى بريدك الإلكتروني: <br />
+                  لقد أرسلنا رمز التحقق إلى بريدك الإلكتروني: <br />
                   <span className="text-white font-bold">{email}</span>
                 </p>
               </div>
@@ -399,11 +399,11 @@ export default function Auth() {
                 <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
                 <Input 
                   type="text" 
-                  maxLength={6}
-                  placeholder="رمز التحقق (6 أرقام)" 
+                  maxLength={8}
+                  placeholder="رمز التحقق" 
                   value={otpToken} 
                   onChange={(e) => setOtpToken(e.target.value.replace(/\D/g, ""))} 
-                  className="bg-[#111111] border-none h-14 pr-12 text-center text-xl font-bold tracking-[0.5em] rounded-xl focus:ring-1 focus:ring-[#F59E0B]" 
+                  className="bg-[#111111] border-none h-14 pr-12 text-center text-xl font-bold tracking-[0.3em] rounded-xl focus:ring-1 focus:ring-[#F59E0B]" 
                   required 
                 />
               </div>
@@ -419,7 +419,7 @@ export default function Auth() {
             <>
               <div className="text-center mb-4">
                 <p className="text-sm text-gray-400">
-                  لقد أرسلنا رمز استعادة الحساب المكون من 6 أرقام إلى بريدك الإلكتروني: <br />
+                  لقد أرسلنا رمز استعادة الحساب إلى بريدك الإلكتروني: <br />
                   <span className="text-white font-bold">{email}</span>
                 </p>
               </div>
@@ -427,11 +427,11 @@ export default function Auth() {
                 <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
                 <Input 
                   type="text" 
-                  maxLength={6}
-                  placeholder="رمز الاستعادة (6 أرقام)" 
+                  maxLength={8}
+                  placeholder="رمز الاستعادة" 
                   value={otpToken} 
                   onChange={(e) => setOtpToken(e.target.value.replace(/\D/g, ""))} 
-                  className="bg-[#111111] border-none h-14 pr-12 text-center text-xl font-bold tracking-[0.5em] rounded-xl focus:ring-1 focus:ring-[#F59E0B]" 
+                  className="bg-[#111111] border-none h-14 pr-12 text-center text-xl font-bold tracking-[0.3em] rounded-xl focus:ring-1 focus:ring-[#F59E0B]" 
                   required 
                 />
               </div>
