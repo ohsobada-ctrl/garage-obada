@@ -1,38 +1,8 @@
-import { useEffect, useRef } from 'react';
 import { Bell, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notification } from '@/types/car';
 import { cn } from '@/lib/utils';
-import { Capacitor } from '@capacitor/core';
-import { LocalNotifications } from '@capacitor/local-notifications';
-
-// صوت تنبيه بسيط باستخدام Web Audio API
-let audioCtx: AudioContext | null = null;
-
-function playBeepSound() {
-  try {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    // استئناف السياق إذا كان معلقاً (سياسة المتصفح)
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    const oscillator = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    oscillator.connect(gain);
-    gain.connect(audioCtx.destination);
-    oscillator.frequency.value = 880;
-    oscillator.type = 'sine';
-    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
-    oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + 0.5);
-  } catch (e) {
-    console.warn('تعذر تشغيل صوت التنبيه:', e);
-  }
-}
 
 interface NotificationCenterProps {
   notifications: Notification[];
@@ -41,38 +11,6 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ notifications, onClose, showHeader = true }: NotificationCenterProps) {
-  
-  const hasSoundPlayed = useRef(false);
-
-  useEffect(() => {
-    if (notifications.length > 0 && !hasSoundPlayed.current) {
-      hasSoundPlayed.current = true;
-      const lastNotification = notifications[0];
-
-      if (Capacitor.isNativePlatform()) {
-        LocalNotifications.schedule({
-          notifications: [{
-            title: lastNotification.carName,
-            body: lastNotification.message,
-            id: Date.now(),
-            channelId: 'default-channel',
-            sound: 'default',
-          }]
-        }).catch(console.error);
-      } else {
-        // تشغيل الصوت بعد أي تفاعل من المستخدم
-        const triggerSound = () => {
-          playBeepSound();
-          document.removeEventListener('click', triggerSound);
-          document.removeEventListener('touchstart', triggerSound);
-        };
-        // جرب تشغيله مباشرة، وإذا ما اشتغل ننتظر تفاعل
-        playBeepSound();
-        document.addEventListener('click', triggerSound, { once: true });
-        document.addEventListener('touchstart', triggerSound, { once: true });
-      }
-    }
-  }, [notifications.length]);
 
   const getSeverityIcon = (severity: Notification['severity']) => {
     switch (severity) {

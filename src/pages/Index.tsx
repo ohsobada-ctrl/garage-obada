@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Car, Bell, Plus, ChevronLeft, Gauge, Trash2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Capacitor } from '@capacitor/core';
-import { LocalNotifications } from '@capacitor/local-notifications';
+import { NotificationService } from "@/services/notificationService";
 import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { AddCarDialog } from '@/components/AddCarDialog';
@@ -51,45 +50,12 @@ const Index = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [carToDelete, setCarToDelete] = useState<CarType | null>(null);
 
-  // Trigger system/browser notifications for new alerts
+  // Schedule background notifications natively in the OS
   useEffect(() => {
-    if (isLoaded && notifications.length > 0) {
-      const shownNotifications = JSON.parse(localStorage.getItem('shown-notifications') || '[]');
-      const newNotifications = notifications.filter(n => !shownNotifications.includes(n.id));
-
-      if (newNotifications.length > 0) {
-        newNotifications.forEach(async (n) => {
-          if (Capacitor.getPlatform() === 'web') {
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification(n.carName, {
-                body: n.message,
-                icon: '/favicon.ico'
-              });
-            }
-          } else {
-            try {
-              const isPushSupported = await LocalNotifications.checkPermissions();
-              if (isPushSupported.display === 'granted') {
-                await LocalNotifications.schedule({
-                  notifications: [{
-                    title: n.carName,
-                    body: n.message,
-                    id: Math.floor(Math.random() * 100000),
-                    sound: 'default',
-                    channelId: 'maintenance-alerts',
-                  }]
-                });
-              }
-            } catch (err) {
-              console.error('Error sending local notification:', err);
-            }
-          }
-          shownNotifications.push(n.id);
-        });
-        localStorage.setItem('shown-notifications', JSON.stringify(shownNotifications));
-      }
+    if (isLoaded && cars.length > 0) {
+      NotificationService.scheduleBackgroundNotifications(cars);
     }
-  }, [notifications, isLoaded]);
+  }, [cars, isLoaded]);
 
   useEffect(() => {
     if (isLoaded && cars.length > 0 && shouldShowMileagePrompt()) {
