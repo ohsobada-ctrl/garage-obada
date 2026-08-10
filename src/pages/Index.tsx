@@ -61,7 +61,7 @@ const Index = () => {
   useEffect(() => {
     if (!isLoaded || notifications.length === 0) return;
 
-    // Play sound only once per browser session
+    // --- Sound: once per session ---
     const soundPlayed = sessionStorage.getItem('garage-alert-sound-played');
     if (!soundPlayed) {
       sessionStorage.setItem('garage-alert-sound-played', 'true');
@@ -80,55 +80,62 @@ const Index = () => {
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
           oscillator.start(ctx.currentTime);
           oscillator.stop(ctx.currentTime + 0.6);
-        } catch (e) {
-          // ignore
-        }
+        } catch (_) { /* ignore */ }
       };
 
-      // Try autoplay first (works on desktop)
-      // If blocked (mobile), wait for first user interaction
       try {
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         if (ctx.state === 'running') {
           playSound();
         } else {
-          // Mobile blocks autoplay — wait for first touch/click
-          const unlockAndPlay = () => {
-            playSound();
-            document.removeEventListener('click', unlockAndPlay);
-            document.removeEventListener('touchstart', unlockAndPlay);
-          };
+          const unlockAndPlay = () => { playSound(); };
           document.addEventListener('click', unlockAndPlay, { once: true });
           document.addEventListener('touchstart', unlockAndPlay, { once: true });
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch (_) { /* ignore */ }
     }
 
-    // Send immediate browser notification for unseen active alerts
-    if ('Notification' in window && Notification.permission === 'granted') {
+    // --- Browser notifications: only for unseen alerts ---
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    try {
       const shownKey = 'garage-shown-alerts';
       const shown: string[] = JSON.parse(localStorage.getItem(shownKey) || '[]');
       const newAlerts = notifications.filter(n => !shown.includes(n.id));
+      if (newAlerts.length === 0) return;
 
-      if (newAlerts.length > 0) {
-        const topAlert = newAlerts[0];
-        const extraCount = newAlerts.length - 1;
-        new Notification(topAlert.carName, {
-          body: extraCount > 0
-            ? `${topAlert.message} (+${extraCount} تنبيهات أخرى)`
-            : topAlert.message,
-          icon: '/favicon.ico',
-          tag: 'garage-active-alerts',
-        });
+      const topAlert = newAlerts[0];
+      const body = newAlerts.length > 1
+        ? `${topAlert.message} (+${newAlerts.length - 1} تنبيهات أخرى)`
+        : topAlert.message;
 
-        localStorage.setItem(shownKey, JSON.stringify([
-          ...shown,
-          ...newAlerts.map(n => n.id),
-        ]));
+      // Try Service Worker showNotification first (works on Android + desktop)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration('/').then(reg => {
+          if (reg) {
+            reg.showNotification(topAlert.carName, {
+              body,
+              icon: '/favicon.ico',
+              tag: 'garage-active-alerts',
+            }).catch(() => {
+              // SW failed — fallback to direct (desktop only)
+              try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) {}
+            });
+          } else {
+            // No SW registered — try direct (desktop only, Android may throw)
+            try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) {}
+          }
+        }).catch(() => {});
+      } else {
+        // No service worker support — desktop fallback
+        try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) {}
       }
-    }
+
+      localStorage.setItem(shownKey, JSON.stringify([
+        ...shown,
+        ...newAlerts.map(n => n.id),
+      ]));
+    } catch (_) { /* ignore any unexpected errors */ }
   }, [isLoaded, notifications.length]);
 
   useEffect(() => {
