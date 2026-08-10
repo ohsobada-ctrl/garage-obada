@@ -57,6 +57,58 @@ const Index = () => {
     }
   }, [cars, isLoaded]);
 
+  // Play sound + send immediate browser notifications on first load with active alerts
+  useEffect(() => {
+    if (!isLoaded || notifications.length === 0) return;
+
+    // Play sound only once per browser session
+    const soundPlayed = sessionStorage.getItem('garage-alert-sound-played');
+    if (!soundPlayed) {
+      sessionStorage.setItem('garage-alert-sound-played', 'true');
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(660, ctx.currentTime);
+        oscillator.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.6);
+      } catch (e) {
+        // Autoplay may be blocked before user interaction — that's fine
+      }
+    }
+
+    // Send immediate browser notification for unseen active alerts
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const shownKey = 'garage-shown-alerts';
+      const shown: string[] = JSON.parse(localStorage.getItem(shownKey) || '[]');
+      const newAlerts = notifications.filter(n => !shown.includes(n.id));
+
+      if (newAlerts.length > 0) {
+        // Show one summary notification
+        const topAlert = newAlerts[0];
+        const extraCount = newAlerts.length - 1;
+        new Notification(topAlert.carName, {
+          body: extraCount > 0
+            ? `${topAlert.message} (+${extraCount} تنبيهات أخرى)`
+            : topAlert.message,
+          icon: '/favicon.ico',
+          tag: 'garage-active-alerts',
+        });
+
+        localStorage.setItem(shownKey, JSON.stringify([
+          ...shown,
+          ...newAlerts.map(n => n.id),
+        ]));
+      }
+    }
+  }, [isLoaded, notifications.length]);
+
   useEffect(() => {
     if (isLoaded && cars.length > 0 && shouldShowMileagePrompt()) {
       const timer = setTimeout(() => {
