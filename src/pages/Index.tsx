@@ -65,21 +65,44 @@ const Index = () => {
     const soundPlayed = sessionStorage.getItem('garage-alert-sound-played');
     if (!soundPlayed) {
       sessionStorage.setItem('garage-alert-sound-played', 'true');
+
+      const playSound = () => {
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const oscillator = ctx.createOscillator();
+          const gain = ctx.createGain();
+          oscillator.connect(gain);
+          gain.connect(ctx.destination);
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(660, ctx.currentTime);
+          oscillator.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.4, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+          oscillator.start(ctx.currentTime);
+          oscillator.stop(ctx.currentTime + 0.6);
+        } catch (e) {
+          // ignore
+        }
+      };
+
+      // Try autoplay first (works on desktop)
+      // If blocked (mobile), wait for first user interaction
       try {
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const oscillator = ctx.createOscillator();
-        const gain = ctx.createGain();
-        oscillator.connect(gain);
-        gain.connect(ctx.destination);
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(660, ctx.currentTime);
-        oscillator.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.4, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 0.6);
+        if (ctx.state === 'running') {
+          playSound();
+        } else {
+          // Mobile blocks autoplay — wait for first touch/click
+          const unlockAndPlay = () => {
+            playSound();
+            document.removeEventListener('click', unlockAndPlay);
+            document.removeEventListener('touchstart', unlockAndPlay);
+          };
+          document.addEventListener('click', unlockAndPlay, { once: true });
+          document.addEventListener('touchstart', unlockAndPlay, { once: true });
+        }
       } catch (e) {
-        // Autoplay may be blocked before user interaction — that's fine
+        // ignore
       }
     }
 
@@ -90,7 +113,6 @@ const Index = () => {
       const newAlerts = notifications.filter(n => !shown.includes(n.id));
 
       if (newAlerts.length > 0) {
-        // Show one summary notification
         const topAlert = newAlerts[0];
         const extraCount = newAlerts.length - 1;
         new Notification(topAlert.carName, {

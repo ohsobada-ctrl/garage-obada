@@ -23,7 +23,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // IMPORTANT: We ignore SIGNED_OUT events that happen transiently (e.g. when
+    // the Android app comes back from background and the token is mid-refresh).
+    // We verify the session is truly gone before clearing the user.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        // Double-check that there truly is no session before clearing the user
+        supabase.auth.getSession().then(({ data }) => {
+          if (!data.session) {
+            setUser(null);
+            setLoading(false);
+          }
+        });
+        return;
+      }
+
       if (session?.user) {
         setUser({
           uid: session.user.id,
