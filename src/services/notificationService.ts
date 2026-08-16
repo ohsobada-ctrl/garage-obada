@@ -46,7 +46,7 @@ export const NotificationService = {
             body: notification.body || '',
             schedule: { at: new Date(Date.now() + 100) },
             sound: 'default',
-            channelId: 'default-channel',
+            channelId: 'default-channel-v2',
           }]
         }).catch(() => {});
       });
@@ -133,23 +133,29 @@ export const NotificationService = {
   async createChannel() {
     try {
       if (Capacitor.getPlatform() === 'android') {
-        // Create maintenance channel
+        // Delete old cached channels if they exist to force sound settings refresh
+        try {
+          await LocalNotifications.deleteChannel({ id: 'maintenance-alerts' });
+          await LocalNotifications.deleteChannel({ id: 'default-channel' });
+        } catch (_) {}
+
+        // Create high importance maintenance channel v2
         await LocalNotifications.createChannel({
-          id: 'maintenance-alerts',
-          name: 'تنبيهات الصيانة',
+          id: 'maintenance-alerts-v2',
+          name: 'تنبيهات الصيانة الفورية',
           importance: 5,
-          description: 'تنبيهات هامة لمواعيد الصيانة',
+          description: 'تنبيهات هامة لمواعيد الصيانة مع الصوت والاهتزاز',
           sound: 'default',
           visibility: 1,
           vibration: true
         });
 
-        // Create default channel
+        // Create high importance default channel v2
         await LocalNotifications.createChannel({
-          id: 'default-channel',
-          name: 'التنبيهات العامة',
+          id: 'default-channel-v2',
+          name: 'التنبيهات العامة المباشرة',
           importance: 5,
-          description: 'تنبيهات عامة من التطبيق',
+          description: 'تنبيهات عامة مع الصوت والاهتزاز',
           sound: 'default',
           visibility: 1,
           vibration: true
@@ -266,7 +272,7 @@ export const NotificationService = {
           body: n.body,
           schedule: { at: n.at },
           sound: 'default',
-          channelId: 'maintenance-alerts',
+          channelId: 'maintenance-alerts-v2',
         })),
       });
 

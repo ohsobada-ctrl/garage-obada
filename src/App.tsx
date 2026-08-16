@@ -53,7 +53,7 @@ const App = () => {
                 body: item.body,
                 schedule: { at: new Date(Date.now() + 200) },
                 sound: 'default',
-                channelId: 'default-channel',
+                channelId: 'default-channel-v2',
               }]
             }).catch(() => {});
           } else if ('Notification' in window && Notification.permission === 'granted') {

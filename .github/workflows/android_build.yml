@@ -33,10 +33,15 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x android/gradlew
 
-      - name: Decode Signing Keystore (if secret exists)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      - name: Decode Release Keystore from Secrets
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          fi
+          if [ ! -f android/app/release.keystore ]; then
+            echo "CRITICAL ERROR: release.keystore not found. Release signing requires a valid keystore."
+            exit 1
+          fi
 
       - name: Build Release APK
         env:
@@ -48,9 +53,24 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      - name: Verify Release APK Certificate & SHA-256
+      - name: Verify APK Certificate SHA-256 Match with Keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'garage123456' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'garage' }}
         run: |
-          keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk
+          echo "Extracting SHA-256 from release.keystore..."
+          KEYSTORE_SHA256=$(keytool -list -v -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | grep "SHA256:" | head -n 1 | awk '{print $2}')
+          echo "Keystore SHA-256: $KEYSTORE_SHA256"
+
+          echo "Extracting SHA-256 from compiled app-release.apk..."
+          APK_SHA256=$(keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk | grep "SHA256:" | head -n 1 | awk '{print $2}')
+          echo "APK SHA-256:      $APK_SHA256"
+
+          if [ -z "$APK_SHA256" ] || [ "$KEYSTORE_SHA256" != "$APK_SHA256" ]; then
+            echo "ERROR: Certificate mismatch between release.keystore and compiled APK!"
+            exit 1
+          fi
+          echo "SUCCESS: APK Certificate matches release.keystore 100%!"
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
