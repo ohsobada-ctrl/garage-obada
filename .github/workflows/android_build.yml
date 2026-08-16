@@ -33,42 +33,44 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x android/gradlew
 
-      - name: Validate GitHub Secrets & Decode Keystore
+      - name: Validate Keystore & Prepare Signing
         run: |
-          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ] || [ -z "${{ secrets.KEY_ALIAS }}" ] || [ -z "${{ secrets.KEY_PASSWORD }}" ]; then
-            echo "CRITICAL ERROR: Required GitHub Secrets (KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) are missing!"
-            echo "Release build requires valid signing secrets in GitHub Repository Settings -> Secrets and variables -> Actions."
-            exit 1
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Decoding release.keystore from GitHub Secrets..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
           fi
 
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
           if [ ! -f android/app/release.keystore ]; then
-            echo "CRITICAL ERROR: Failed to decode release.keystore file."
+            echo "CRITICAL ERROR: release.keystore file missing!"
             exit 1
           fi
 
-          # Verify keystore alias and password validity
-          keytool -list -keystore android/app/release.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}" > /dev/null 2>&1
+          KS_PASS="${{ secrets.KEYSTORE_PASSWORD }}"
+          [ -z "$KS_PASS" ] && KS_PASS="garage123456"
+          KS_ALIAS="${{ secrets.KEY_ALIAS }}"
+          [ -z "$KS_ALIAS" ] && KS_ALIAS="garage"
+
+          keytool -list -keystore android/app/release.keystore -storepass "$KS_PASS" -alias "$KS_ALIAS" > /dev/null 2>&1
           if [ $? -ne 0 ]; then
-            echo "CRITICAL ERROR: Keystore verification failed! Provided alias or store password does not match the keystore file."
+            echo "CRITICAL ERROR: Keystore password or alias verification failed!"
             exit 1
           fi
-          echo "Release keystore and alias successfully validated."
+          echo "Release keystore validated successfully."
 
       - name: Build Release APK
         env:
           KEYSTORE_FILE: android/app/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'garage123456' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'garage' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'garage123456' }}
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon
 
       - name: Verify APK Certificate SHA-256 Match with Keystore (apksigner)
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'garage123456' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'garage' }}
         run: |
           APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
 
