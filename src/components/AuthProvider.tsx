@@ -34,47 +34,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const restoreUserSession = (sessionUser?: any) => {
-      if (sessionUser) {
-        const userEmail = sessionUser.email || localStorage.getItem("garage_user_email") || undefined;
-        if (userEmail) localStorage.setItem("garage_user_email", userEmail);
-        localStorage.setItem("garage_user_id", sessionUser.id);
-
-        const isAdmin = checkAdminStatus(userEmail);
-        setUser({
-          uid: sessionUser.id,
-          phoneNumber: sessionUser.phone || sessionUser.user_metadata?.phone || localStorage.getItem("garage_user_phone") || undefined,
-          phone: sessionUser.phone || sessionUser.user_metadata?.phone || localStorage.getItem("garage_user_phone") || undefined,
-          email: userEmail,
-          role: isAdmin ? "admin" : "user",
-          isAdmin: isAdmin,
-        });
-        setLoading(false);
-        return true;
-      }
-
-      // Check local storage fallback for offline / persistent login
-      const savedId = localStorage.getItem("garage_user_id");
-      const savedEmail = localStorage.getItem("garage_user_email") || undefined;
-      const savedPhone = localStorage.getItem("garage_user_phone") || undefined;
-
-      if (savedId) {
-        const isAdmin = checkAdminStatus(savedEmail);
-        setUser({
-          uid: savedId,
-          phoneNumber: savedPhone,
-          phone: savedPhone,
-          email: savedEmail,
-          role: isAdmin ? "admin" : "user",
-          isAdmin: isAdmin,
-        });
-        setLoading(false);
-        return true;
-      }
-
-      setUser(null);
+    const timer = setTimeout(() => {
       setLoading(false);
-      return false;
+    }, 1000);
+
+    const restoreUserSession = (sessionUser?: any) => {
+      try {
+        if (sessionUser) {
+          const userEmail = sessionUser.email || localStorage.getItem("garage_user_email") || undefined;
+          if (userEmail) localStorage.setItem("garage_user_email", userEmail);
+          localStorage.setItem("garage_user_id", sessionUser.id);
+
+          const isAdmin = checkAdminStatus(userEmail);
+          setUser({
+            uid: sessionUser.id,
+            phoneNumber: sessionUser.phone || sessionUser.user_metadata?.phone || localStorage.getItem("garage_user_phone") || undefined,
+            phone: sessionUser.phone || sessionUser.user_metadata?.phone || localStorage.getItem("garage_user_phone") || undefined,
+            email: userEmail,
+            role: isAdmin ? "admin" : "user",
+            isAdmin: isAdmin,
+          });
+          setLoading(false);
+          return true;
+        }
+
+        // Check local storage fallback for offline / persistent login
+        const savedId = localStorage.getItem("garage_user_id");
+        const savedEmail = localStorage.getItem("garage_user_email") || undefined;
+        const savedPhone = localStorage.getItem("garage_user_phone") || undefined;
+
+        if (savedId) {
+          const isAdmin = checkAdminStatus(savedEmail);
+          setUser({
+            uid: savedId,
+            phoneNumber: savedPhone,
+            phone: savedPhone,
+            email: savedEmail,
+            role: isAdmin ? "admin" : "user",
+            isAdmin: isAdmin,
+          });
+          setLoading(false);
+          return true;
+        }
+
+        setUser(null);
+        setLoading(false);
+        return false;
+      } catch (err) {
+        console.error("Auth session error:", err);
+        setLoading(false);
+        return false;
+      }
     };
 
     // Get initial session
@@ -102,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);
