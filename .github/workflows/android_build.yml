@@ -33,44 +33,68 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x android/gradlew
 
-      - name: Decode Release Keystore from Secrets
+      - name: Validate GitHub Secrets & Decode Keystore
         run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-          fi
-          if [ ! -f android/app/release.keystore ]; then
-            echo "CRITICAL ERROR: release.keystore not found. Release signing requires a valid keystore."
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ] || [ -z "${{ secrets.KEY_ALIAS }}" ] || [ -z "${{ secrets.KEY_PASSWORD }}" ]; then
+            echo "CRITICAL ERROR: Required GitHub Secrets (KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) are missing!"
+            echo "Release build requires valid signing secrets in GitHub Repository Settings -> Secrets and variables -> Actions."
             exit 1
           fi
+
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          if [ ! -f android/app/release.keystore ]; then
+            echo "CRITICAL ERROR: Failed to decode release.keystore file."
+            exit 1
+          fi
+
+          # Verify keystore alias and password validity
+          keytool -list -keystore android/app/release.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}" > /dev/null 2>&1
+          if [ $? -ne 0 ]; then
+            echo "CRITICAL ERROR: Keystore verification failed! Provided alias or store password does not match the keystore file."
+            exit 1
+          fi
+          echo "Release keystore and alias successfully validated."
 
       - name: Build Release APK
         env:
           KEYSTORE_FILE: android/app/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'garage123456' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'garage' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'garage123456' }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      - name: Verify APK Certificate SHA-256 Match with Keystore
+      - name: Verify APK Certificate SHA-256 Match with Keystore (apksigner)
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'garage123456' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'garage' }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "Extracting SHA-256 from release.keystore..."
-          KEYSTORE_SHA256=$(keytool -list -v -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | grep "SHA256:" | head -n 1 | awk '{print $2}')
-          echo "Keystore SHA-256: $KEYSTORE_SHA256"
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
 
-          echo "Extracting SHA-256 from compiled app-release.apk..."
-          APK_SHA256=$(keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk | grep "SHA256:" | head -n 1 | awk '{print $2}')
-          echo "APK SHA-256:      $APK_SHA256"
+          # Extract raw SHA-256 hex string from Keystore
+          KEYSTORE_RAW=$(keytool -list -v -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | grep -i "SHA256:" | head -n 1 | awk '{print $2}')
+          KEYSTORE_HEX=$(echo "$KEYSTORE_RAW" | tr -d ': ' | tr '[:lower:]' '[:upper:]')
 
-          if [ -z "$APK_SHA256" ] || [ "$KEYSTORE_SHA256" != "$APK_SHA256" ]; then
-            echo "ERROR: Certificate mismatch between release.keystore and compiled APK!"
+          # Extract raw SHA-256 hex string from Compiled APK using apksigner
+          APK_RAW=$($APKSIGNER verify --print-certs android/app/build/outputs/apk/release/app-release.apk | grep -i "SHA-256 digest:" | head -n 1 | awk '{print $NF}')
+          APK_HEX=$(echo "$APK_RAW" | tr -d ': ' | tr '[:lower:]' '[:upper:]')
+
+          FORMATTED_SHA256=$(echo "$KEYSTORE_HEX" | sed 's/../&:/g' | sed 's/:$//')
+
+          echo "=================================================="
+          echo "Package Name:        com.obada.garage.app"
+          echo "Version Code:        2"
+          echo "Version Name:        1.0.1"
+          echo "Certificate SHA-256: $FORMATTED_SHA256"
+          echo "=================================================="
+
+          if [ -z "$APK_HEX" ] || [ "$KEYSTORE_HEX" != "$APK_HEX" ]; then
+            echo "COMPARISON RESULT: FAIL ❌ (Keystore SHA-256 digest does NOT match APK certificate!)"
             exit 1
           fi
-          echo "SUCCESS: APK Certificate matches release.keystore 100%!"
+
+          echo "COMPARISON RESULT: MATCH 100% ✅ (Keystore SHA-256 matches compiled APK certificate)"
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4

@@ -23,13 +23,17 @@ android {
             if (!keystoreFile.exists()) {
                 keystoreFile = file("release.keystore")
             }
-            if (keystoreFile.exists()) {
+            def ksPass = System.getenv("KEYSTORE_PASSWORD")
+            def kAlias = System.getenv("KEY_ALIAS")
+            def kPass = System.getenv("KEY_PASSWORD")
+
+            if (keystoreFile.exists() && ksPass && kAlias && kPass) {
                 storeFile keystoreFile
-                storePassword(System.getenv("KEYSTORE_PASSWORD") ?: "garage123456")
-                keyAlias(System.getenv("KEY_ALIAS") ?: "garage")
-                keyPassword(System.getenv("KEY_PASSWORD") ?: "garage123456")
+                storePassword ksPass
+                keyAlias kAlias
+                keyPassword kPass
             } else {
-                throw new GradleException("Release keystore missing at: " + keystoreFile.absolutePath + ". Cannot build release APK without a valid release keystore.")
+                throw new GradleException("CRITICAL ERROR: Release keystore file or environment secrets (KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) are missing. Cannot build release APK without valid release signing credentials.")
             }
         }
     }
