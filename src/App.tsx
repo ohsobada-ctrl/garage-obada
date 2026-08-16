@@ -7,6 +7,9 @@ import { NotificationService } from "@/services/notificationService";
 import { AuthProvider } from "@/components/AuthProvider";
 import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { saveBroadcastNotification } from "@/components/AdminDashboard";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -31,6 +34,43 @@ const App = () => {
   useEffect(() => {
     NotificationService.createChannel();
     NotificationService.requestPermissions();
+
+    // Top-level global broadcast listener for ALL devices/users (guest or logged-in)
+    const channel = supabase
+      .channel('garage_global_broadcasts_app')
+      .on('broadcast', { event: 'new_admin_notification' }, (payload) => {
+        if (payload.payload) {
+          const item = payload.payload;
+          saveBroadcastNotification(item);
+
+          // Trigger native notification with sound or browser alert
+          if (Capacitor.isNativePlatform()) {
+            LocalNotifications.schedule({
+              notifications: [{
+                id: Math.floor(Math.random() * 100000),
+                title: `📢 ${item.title}`,
+                body: item.body,
+                schedule: { at: new Date(Date.now() + 200) },
+                sound: 'default',
+                channelId: 'default-channel',
+              }]
+            }).catch(() => {});
+          } else if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(`📢 ${item.title}`, {
+                body: item.body,
+                icon: '/favicon.ico',
+                tag: item.id
+              });
+            } catch (_) {}
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
