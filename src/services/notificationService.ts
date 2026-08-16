@@ -1,8 +1,64 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { Car } from '@/types/car';
+import { supabase } from "@/integrations/supabase/client";
 
 export const NotificationService = {
+  async initPushNotifications() {
+    try {
+      if (!Capacitor.isNativePlatform()) return;
+
+      let perm = await PushNotifications.checkPermissions();
+      if (perm.receive !== 'granted') {
+        perm = await PushNotifications.requestPermissions();
+      }
+
+      if (perm.receive === 'granted') {
+        await PushNotifications.register();
+      }
+
+      // FCM Push Token registration listener - independent of login state
+      PushNotifications.addListener('registration', async (token) => {
+        console.log('FCM Push Token received:', token.value);
+        localStorage.setItem('garage_fcm_token', token.value);
+
+        try {
+          await supabase.from('fcm_tokens' as any).upsert({
+            token: token.value,
+            platform: Capacitor.getPlatform(),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'token' });
+        } catch (_) {}
+      });
+
+      PushNotifications.addListener('registrationError', (err) => {
+        console.error('FCM Registration Error:', err);
+      });
+
+      // FCM Push Notification Received listener (Foreground/Background)
+      PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        console.log('FCM Push notification received:', notification);
+        LocalNotifications.schedule({
+          notifications: [{
+            id: Math.floor(Math.random() * 100000),
+            title: notification.title || '📢 تنبيه من كراج',
+            body: notification.body || '',
+            schedule: { at: new Date(Date.now() + 100) },
+            sound: 'default',
+            channelId: 'default-channel',
+          }]
+        }).catch(() => {});
+      });
+
+      PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+        console.log('FCM Action performed:', notification);
+      });
+    } catch (e) {
+      console.error('FCM Init Error:', e);
+    }
+  },
+
   async requestPermissions() {
     try {
       if (Capacitor.getPlatform() === 'web') {

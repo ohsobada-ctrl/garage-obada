@@ -34,6 +34,7 @@ const App = () => {
   useEffect(() => {
     NotificationService.createChannel();
     NotificationService.requestPermissions();
+    NotificationService.initPushNotifications();
 
     // Top-level global broadcast listener for ALL devices/users (guest or logged-in)
     const channel = supabase
