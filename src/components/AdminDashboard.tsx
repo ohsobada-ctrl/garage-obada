@@ -127,7 +127,16 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
       // 2. Broadcast live via Supabase Realtime channel to ALL connected users
       try {
         const channel = supabase.channel('garage_global_broadcasts');
-        await channel.subscribe();
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            channel.send({
+              type: 'broadcast',
+              event: 'new_admin_notification',
+              payload: newNotification,
+            });
+          }
+        });
+
         await channel.send({
           type: 'broadcast',
           event: 'new_admin_notification',

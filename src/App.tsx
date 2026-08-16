@@ -38,7 +38,7 @@ const App = () => {
 
     // Top-level global broadcast listener for ALL devices/users (guest or logged-in)
     const channel = supabase
-      .channel('garage_global_broadcasts_app')
+      .channel('garage_global_broadcasts')
       .on('broadcast', { event: 'new_admin_notification' }, (payload) => {
         if (payload.payload) {
           const item = payload.payload;
