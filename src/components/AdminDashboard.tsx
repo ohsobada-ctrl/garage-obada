@@ -121,10 +121,23 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
         senderName: user?.email || "إدارة كراج"
       };
 
-      // 1. Save locally & broadcast to active window
+      // 1. Save locally
       saveBroadcastNotification(newNotification);
 
-      // 2. Try inserting into Supabase broadcast_notifications if table exists
+      // 2. Broadcast live via Supabase Realtime channel to ALL connected users
+      try {
+        const channel = supabase.channel('garage_global_broadcasts');
+        await channel.subscribe();
+        await channel.send({
+          type: 'broadcast',
+          event: 'new_admin_notification',
+          payload: newNotification,
+        });
+      } catch (rtErr) {
+        console.error("Realtime broadcast error:", rtErr);
+      }
+
+      // 3. Save into Supabase table if available
       try {
         await supabase.from("broadcast_notifications" as any).insert({
           title: newNotification.title,
@@ -132,11 +145,9 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
           severity: newNotification.severity,
           sender_id: user?.uid
         });
-      } catch (dbErr) {
-        // Table might not exist yet, local fallback handles display
-      }
+      } catch (_) {}
 
-      // 3. Trigger native or browser notification immediately for feedback
+      // 4. Trigger native or browser notification for sender
       if ('Notification' in window && Notification.permission === 'granted') {
         try {
           new Notification(`📢 ${newNotification.title}`, {

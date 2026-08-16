@@ -30,7 +30,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { AdminDashboard, getBroadcastNotifications } from '@/components/AdminDashboard';
+import { supabase } from "@/integrations/supabase/client";
+import { AdminDashboard, getBroadcastNotifications, saveBroadcastNotification } from '@/components/AdminDashboard';
 import type { Notification } from '@/types/car';
 
 const Index = () => {
@@ -71,7 +72,34 @@ const Index = () => {
 
     syncBroadcasts();
     window.addEventListener('garage_new_broadcast', syncBroadcasts);
-    return () => window.removeEventListener('garage_new_broadcast', syncBroadcasts);
+
+    // Subscribe to live global Supabase broadcast channel for all users
+    const channel = supabase
+      .channel('garage_global_broadcasts')
+      .on('broadcast', { event: 'new_admin_notification' }, (payload) => {
+        if (payload.payload) {
+          const item = payload.payload;
+          saveBroadcastNotification(item);
+          syncBroadcasts();
+
+          // Show browser/system notification immediately
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(`📢 ${item.title}`, {
+                body: item.body,
+                icon: '/favicon.ico',
+                tag: item.id
+              });
+            } catch (_) {}
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('garage_new_broadcast', syncBroadcasts);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const allNotifications = [...broadcasts, ...notifications];
