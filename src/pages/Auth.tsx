@@ -73,7 +73,7 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase(),
         password,
       });
@@ -91,6 +91,11 @@ export default function Auth() {
           throw new Error("بيانات الدخول غير صحيحة. تأكد من البريد الإلكتروني وكلمة المرور.");
         }
         throw error;
+      }
+      
+      if (data?.user) {
+        localStorage.setItem("garage_user_email", email.toLowerCase().trim());
+        localStorage.setItem("garage_user_id", data.user.id);
       }
       
       // حفظ خيار تذكرني

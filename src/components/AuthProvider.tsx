@@ -34,54 +34,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const isAdmin = checkAdminStatus();
+    const restoreUserSession = (sessionUser?: any) => {
+      if (sessionUser) {
+        const userEmail = sessionUser.email || localStorage.getItem("garage_user_email") || undefined;
+        if (userEmail) localStorage.setItem("garage_user_email", userEmail);
+        localStorage.setItem("garage_user_id", sessionUser.id);
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const userEmail = session.user.email || undefined;
         const isAdmin = checkAdminStatus(userEmail);
         setUser({
-          uid: session.user.id,
-          phoneNumber: session.user.phone || session.user.user_metadata?.phone || undefined,
-          phone: session.user.phone || session.user.user_metadata?.phone || undefined,
+          uid: sessionUser.id,
+          phoneNumber: sessionUser.phone || sessionUser.user_metadata?.phone || localStorage.getItem("garage_user_phone") || undefined,
+          phone: sessionUser.phone || sessionUser.user_metadata?.phone || localStorage.getItem("garage_user_phone") || undefined,
           email: userEmail,
           role: isAdmin ? "admin" : "user",
           isAdmin: isAdmin,
         });
-      } else {
-        setUser(null);
+        setLoading(false);
+        return true;
       }
+
+      // Check local storage fallback for offline / persistent login
+      const savedId = localStorage.getItem("garage_user_id");
+      const savedEmail = localStorage.getItem("garage_user_email") || undefined;
+      const savedPhone = localStorage.getItem("garage_user_phone") || undefined;
+
+      if (savedId) {
+        const isAdmin = checkAdminStatus(savedEmail);
+        setUser({
+          uid: savedId,
+          phoneNumber: savedPhone,
+          phone: savedPhone,
+          email: savedEmail,
+          role: isAdmin ? "admin" : "user",
+          isAdmin: isAdmin,
+        });
+        setLoading(false);
+        return true;
+      }
+
+      setUser(null);
       setLoading(false);
+      return false;
+    };
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      restoreUserSession(session?.user);
+    }).catch(() => {
+      restoreUserSession();
     });
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        supabase.auth.getSession().then(({ data }) => {
-          if (!data.session) {
-            setUser(null);
-            setLoading(false);
-          }
-        });
+        localStorage.removeItem("garage_user_id");
+        localStorage.removeItem("garage_user_email");
+        localStorage.removeItem("garage_user_phone");
+        localStorage.removeItem("garage_is_admin");
+        setUser(null);
+        setLoading(false);
         return;
       }
 
       if (session?.user) {
-        const userEmail = session.user.email || undefined;
-        const currentAdmin = checkAdminStatus(userEmail);
-        setUser({
-          uid: session.user.id,
-          phoneNumber: session.user.phone || session.user.user_metadata?.phone || undefined,
-          phone: session.user.phone || session.user.user_metadata?.phone || undefined,
-          email: userEmail,
-          role: currentAdmin ? "admin" : "user",
-          isAdmin: currentAdmin,
-        });
-      } else {
-        setUser(null);
+        restoreUserSession(session.user);
       }
-      setLoading(false);
     });
 
     return () => {
