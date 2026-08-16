@@ -30,6 +30,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import { AdminDashboard, getBroadcastNotifications } from '@/components/AdminDashboard';
+import type { Notification } from '@/types/car';
+
 const Index = () => {
   const { user, signOut } = useAuth();
   const { 
@@ -45,10 +48,33 @@ const Index = () => {
   } = useCarsSupabase();
   
   const notifications = useNotifications(cars);
+  const [broadcasts, setBroadcasts] = useState<Notification[]>([]);
   const [selectedCar, setSelectedCar] = useState<CarType | null>(null);
   const [showMileagePrompt, setShowMileagePrompt] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [carToDelete, setCarToDelete] = useState<CarType | null>(null);
+
+  useEffect(() => {
+    const syncBroadcasts = () => {
+      const stored = getBroadcastNotifications();
+      const mapped: Notification[] = stored.map(b => ({
+        id: b.id,
+        carId: 'system',
+        carName: `📢 ${b.title}`,
+        type: 'legal',
+        message: b.body,
+        severity: b.severity,
+        date: b.createdAt
+      }));
+      setBroadcasts(mapped);
+    };
+
+    syncBroadcasts();
+    window.addEventListener('garage_new_broadcast', syncBroadcasts);
+    return () => window.removeEventListener('garage_new_broadcast', syncBroadcasts);
+  }, []);
+
+  const allNotifications = [...broadcasts, ...notifications];
 
   // Schedule background notifications natively in the OS
   useEffect(() => {
@@ -318,6 +344,7 @@ const Index = () => {
               <h1 className="text-xl font-bold">المرآب</h1>
             </div>
             <div className="flex items-center gap-3">
+              <AdminDashboard carsCount={cars.length} />
               <Button variant="ghost" size="icon" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive">
                 <LogOut className="w-5 h-5" />
               </Button>
@@ -326,9 +353,9 @@ const Index = () => {
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="relative">
                   <Bell className="w-4 h-4" />
-                  {notifications.length > 0 && (
+                  {allNotifications.length > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
-                      {notifications.length}
+                      {allNotifications.length}
                     </span>
                   )}
                 </Button>
@@ -338,7 +365,7 @@ const Index = () => {
                   <SheetTitle>مركز التنبيهات</SheetTitle>
                 </SheetHeader>
                 <div className="mt-4">
-                  <NotificationCenter notifications={notifications} showHeader={false} />
+                  <NotificationCenter notifications={allNotifications} showHeader={false} />
                 </div>
               </SheetContent>
             </Sheet>

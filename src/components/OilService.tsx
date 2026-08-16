@@ -173,6 +173,16 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                       />
                     </div>
                   </div>
+                  {/* Expected next oil change mileage badge */}
+                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <Gauge className="w-4 h-4 text-primary" />
+                      العداد القادم المفروض لتغيير الزيت:
+                    </span>
+                    <span className="font-extrabold text-primary text-base dir-ltr">
+                      {((mileageAtChange || 0) + (settings.oilRangeKm || 5000)).toLocaleString()} كم
+                    </span>
+                  </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
                     <Checkbox
                       id="filterChanged"
@@ -258,6 +268,17 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                   )}
                   style={{ width: `${status?.percent}%` }}
                 />
+              </div>
+
+              {/* Next Expected Mileage Highlight Box */}
+              <div className="flex items-center justify-between p-3 mb-3 rounded-lg bg-primary/10 border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-primary shrink-0" />
+                  <span className="text-xs font-semibold text-foreground">العداد القادم المفروض لتغيير الزيت:</span>
+                </div>
+                <span className="font-black text-sm text-primary tracking-wide">
+                  {(latestService.mileageAtChange + settings.oilRangeKm).toLocaleString()} كم
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-sm">

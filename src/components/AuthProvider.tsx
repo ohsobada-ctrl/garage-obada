@@ -6,7 +6,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<CustomUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const checkAdminStatus = (): boolean => {
+    const stored = localStorage.getItem("garage_is_admin");
+    // Default to true for the current active user so they get full Admin access as requested
+    return stored === null ? true : stored === "true";
+  };
+
+  const toggleAdmin = (status?: boolean) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const nextAdminState = status !== undefined ? status : !prev.isAdmin;
+      localStorage.setItem("garage_is_admin", nextAdminState ? "true" : "false");
+      return {
+        ...prev,
+        isAdmin: nextAdminState,
+        role: nextAdminState ? "admin" : "user",
+      };
+    });
+  };
+
   useEffect(() => {
+    const isAdmin = checkAdminStatus();
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -15,6 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phoneNumber: session.user.phone || session.user.user_metadata?.phone || undefined,
           phone: session.user.phone || session.user.user_metadata?.phone || undefined,
           email: session.user.email || undefined,
+          role: isAdmin ? "admin" : "user",
+          isAdmin: isAdmin,
         });
       } else {
         setUser(null);
@@ -23,12 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Listen for auth state changes
-    // IMPORTANT: We ignore SIGNED_OUT events that happen transiently (e.g. when
-    // the Android app comes back from background and the token is mid-refresh).
-    // We verify the session is truly gone before clearing the user.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        // Double-check that there truly is no session before clearing the user
         supabase.auth.getSession().then(({ data }) => {
           if (!data.session) {
             setUser(null);
@@ -39,11 +58,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (session?.user) {
+        const currentAdmin = checkAdminStatus();
         setUser({
           uid: session.user.id,
           phoneNumber: session.user.phone || session.user.user_metadata?.phone || undefined,
           phone: session.user.phone || session.user.user_metadata?.phone || undefined,
           email: session.user.email || undefined,
+          role: currentAdmin ? "admin" : "user",
+          isAdmin: currentAdmin,
         });
       } else {
         setUser(null);
@@ -64,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signOut, toggleAdmin }}>
       {children}
     </AuthContext.Provider>
   );

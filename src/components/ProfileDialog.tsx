@@ -135,6 +135,19 @@ export function ProfileDialog() {
                 className="text-right"
               />
             </div>
+
+            {/* Admin Status Toggle */}
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-amber-500">حالة الصلاحية:</span>
+                <span className="text-xs font-black text-amber-400">
+                  {user?.isAdmin ? "مسؤول النظام (Admin)" : "مستخدم عادي"}
+                </span>
+              </div>
+              <span className="text-[10px] text-amber-500/80 font-bold bg-amber-500/20 px-2 py-0.5 rounded">
+                مفعلة
+              </span>
+            </div>
           </div>
         </div>
 
