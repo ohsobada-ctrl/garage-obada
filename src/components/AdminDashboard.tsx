@@ -50,6 +50,7 @@ export function getBroadcastNotifications(): BroadcastNotification[] {
 
 export function saveBroadcastNotification(item: BroadcastNotification) {
   const current = getBroadcastNotifications();
+  if (current.some(existing => existing.id === item.id)) return;
   const updated = [item, ...current];
   localStorage.setItem(BROADCAST_STORAGE_KEY, JSON.stringify(updated));
   // Dispatch custom window event so open sessions pick it up live

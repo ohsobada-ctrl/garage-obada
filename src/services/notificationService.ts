@@ -87,10 +87,11 @@ export const NotificationService = {
   async createChannel() {
     try {
       if (Capacitor.getPlatform() === 'android') {
-        // Delete old cached channels if they exist to force sound settings refresh
+        // Delete old cached channels if they exist to force sound and dismiss settings refresh
         try {
           await LocalNotifications.deleteChannel({ id: 'maintenance-alerts' });
           await LocalNotifications.deleteChannel({ id: 'default-channel' });
+          await LocalNotifications.deleteChannel({ id: 'default-channel-v2' });
         } catch (_) {}
 
         // Create high importance maintenance channel v2
@@ -104,12 +105,12 @@ export const NotificationService = {
           vibration: true
         });
 
-        // Create high importance default channel v2
+        // Create high importance default channel v3 with explicit sound & swipe dismiss capability
         await LocalNotifications.createChannel({
-          id: 'default-channel-v2',
+          id: 'default-channel-v3',
           name: 'التنبيهات العامة المباشرة',
           importance: 5,
-          description: 'تنبيهات عامة مع الصوت والاهتزاز',
+          description: 'تنبيهات عامة مع الصوت والاهتزاز قابلة للمسح',
           sound: 'default',
           visibility: 1,
           vibration: true

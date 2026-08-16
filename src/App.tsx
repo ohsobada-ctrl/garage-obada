@@ -37,23 +37,37 @@ const App = () => {
     NotificationService.initPushNotifications();
 
     // Top-level global broadcast listener for ALL devices/users (guest or logged-in)
+    const processedIds = new Set<string>();
+
     const channel = supabase
       .channel('garage_global_broadcasts')
       .on('broadcast', { event: 'new_admin_notification' }, (payload) => {
         if (payload.payload) {
           const item = payload.payload;
+
+          // Prevent duplicate execution/scheduling of the same notification
+          if (processedIds.has(item.id)) return;
+          processedIds.add(item.id);
+
           saveBroadcastNotification(item);
 
           // Trigger native notification with sound or browser alert
           if (Capacitor.isNativePlatform()) {
+            let numericId = 1000;
+            for (let i = 0; i < item.id.length; i++) {
+              numericId = (numericId + item.id.charCodeAt(i)) % 2147483647;
+            }
+
             LocalNotifications.schedule({
               notifications: [{
-                id: Math.floor(Math.random() * 100000),
+                id: numericId,
                 title: `📢 ${item.title}`,
                 body: item.body,
-                schedule: { at: new Date(Date.now() + 200) },
+                schedule: { at: new Date(Date.now() + 100) },
                 sound: 'default',
-                channelId: 'default-channel-v2',
+                channelId: 'default-channel-v3',
+                ongoing: false,
+                autoCancel: true,
               }]
             }).catch(() => {});
           } else if ('Notification' in window && Notification.permission === 'granted') {
