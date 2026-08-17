@@ -59,9 +59,10 @@ export function saveBroadcastNotification(item: BroadcastNotification) {
 
 interface AdminDashboardProps {
   carsCount?: number;
+  children?: React.ReactNode;
 }
 
-export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
+export function AdminDashboard({ carsCount = 0, children }: AdminDashboardProps) {
   const { user, toggleAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -244,10 +245,12 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20 font-bold gap-2">
-          <ShieldCheck className="w-4 h-4 text-amber-500" />
-          لوحة الأدمن
-        </Button>
+        {children ? children : (
+          <Button variant="outline" size="sm" className="bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20 font-bold gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-500" />
+            لوحة الأدمن
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto font-sans text-right" dir="rtl">
         <DialogHeader className="flex flex-row items-center justify-between border-b pb-4">

@@ -8,9 +8,10 @@ import { NotificationService } from '@/services/notificationService';
 
 interface AddCarDialogProps {
   onAdd: (car: { make: string; model: string; year: number; currentMileage: number }) => void;
+  children?: React.ReactNode;
 }
 
-export function AddCarDialog({ onAdd }: AddCarDialogProps) {
+export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
   const [open, setOpen] = useState(false);
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
@@ -44,10 +45,12 @@ export function AddCarDialog({ onAdd }: AddCarDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="gold" size="lg" className="gap-3">
-          <Plus className="w-5 h-5" />
-          أضف سيارة جديدة
-        </Button>
+        {children ? children : (
+          <Button variant="gold" size="lg" className="gap-3">
+            <Plus className="w-5 h-5" />
+            أضف سيارة جديدة
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>

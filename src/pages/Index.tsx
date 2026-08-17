@@ -5,9 +5,11 @@ import { NotificationService } from "@/services/notificationService";
 import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { AddCarDialog } from '@/components/AddCarDialog';
-import { ProfileDialog } from '@/components/ProfileDialog';
 import { CarCard } from '@/components/CarCard';
 import { NotificationCenter } from '@/components/NotificationCenter';
+import { SideDrawer } from '@/components/SideDrawer';
+import { BottomNav } from '@/components/BottomNav';
+import { StatsGrid } from '@/components/StatsGrid';
 import { LegalVault } from '@/components/LegalVault';
 import { OilService } from '@/components/OilService';
 import { BrakesTires } from '@/components/BrakesTires';
@@ -31,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { supabase } from "@/integrations/supabase/client";
-import { AdminDashboard, getBroadcastNotifications, saveBroadcastNotification } from '@/components/AdminDashboard';
+import { getBroadcastNotifications, saveBroadcastNotification } from '@/components/AdminDashboard';
 import type { Notification } from '@/types/car';
 
 const Index = () => {
@@ -54,6 +56,7 @@ const Index = () => {
   const [showMileagePrompt, setShowMileagePrompt] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [carToDelete, setCarToDelete] = useState<CarType | null>(null);
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
     const syncBroadcasts = () => {
@@ -349,20 +352,14 @@ const Index = () => {
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center gold-glow-sm">
-                <Car className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <h1 className="text-xl font-bold">المرآب</h1>
+              <SideDrawer carsCount={cars.length} />
+              <h1 className="text-xl font-bold tracking-tight">المرآب</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <AdminDashboard carsCount={cars.length} />
-              
-              <div className="hidden sm:block w-px h-8 bg-border/60 mx-1" />
-
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="icon" className="relative rounded-full bg-background/50 hover:bg-secondary/50 border-border/50">
-                    <Bell className="w-4 h-4" />
+                    <Bell className="w-5 h-5" />
                     {allNotifications.length > 0 && (
                       <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold shadow-sm">
                         {allNotifications.length}
@@ -370,80 +367,57 @@ const Index = () => {
                     )}
                   </Button>
                 </SheetTrigger>
-              <SheetContent side="left" className="w-full sm:max-w-md">
-                <SheetHeader>
-                  <SheetTitle>مركز التنبيهات</SheetTitle>
-                </SheetHeader>
-                <div className="mt-4">
-                  <NotificationCenter notifications={allNotifications} showHeader={false} />
-                </div>
-              </SheetContent>
-            </Sheet>
-
-              <div className="flex items-center gap-2 bg-secondary/30 hover:bg-secondary/50 transition-colors border border-border/50 rounded-full py-1 px-1 pr-4">
-                <ProfileDialog />
-                <Button variant="ghost" size="icon" onClick={() => signOut()} className="w-8 h-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                  <LogOut className="w-4 h-4" />
-                </Button>
-              </div>
+                <SheetContent side="left" className="w-full sm:max-w-md">
+                  <SheetHeader>
+                    <SheetTitle>مركز التنبيهات</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4">
+                    <NotificationCenter notifications={allNotifications} showHeader={false} />
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container pt-6">
+      <main className="container pt-6 pb-24">
         {cars.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-            <Card className="bg-primary/5 border-primary/10">
-              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                <Car className="w-5 h-5 text-primary mb-1" />
-                <p className="text-xl font-bold">{cars.length}</p>
-                <p className="text-[10px] text-muted-foreground uppercase">السيارات</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-destructive/5 border-destructive/10">
-              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                <Bell className="w-5 h-5 text-destructive mb-1" />
-                <p className="text-xl font-bold">{notifications.length}</p>
-                <p className="text-[10px] text-muted-foreground uppercase">تنبيهات</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-secondary/50 border-border/40">
-              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                <Gauge className="w-5 h-5 text-secondary-foreground mb-1" />
-                <p className="text-xl font-bold">{(cars.reduce((acc, c) => acc + c.currentMileage, 0) / 1000).toFixed(1)}k</p>
-                <p className="text-[10px] text-muted-foreground uppercase">إجمالي المسافة</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-primary/5 border-primary/10">
-              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                <ShieldCheck className="w-5 h-5 text-primary mb-1" />
-                <p className="text-xl font-bold">{cars.reduce((acc, c) => acc + c.legalDocs.length, 0)}</p>
-                <p className="text-[10px] text-muted-foreground uppercase">وثائق</p>
-              </CardContent>
-            </Card>
-          </div>
+          <>
+            <StatsGrid cars={cars} notifications={notifications} />
+            
+            <div className="mb-6">
+              <AddCarDialog onAdd={addCar}>
+                <Button className="w-full h-14 text-lg font-bold gradient-gold text-primary-foreground rounded-2xl shadow-lg gold-glow hover:scale-[1.02] transition-transform">
+                  <Plus className="w-6 h-6 ml-2" />
+                  أضف سيارة جديدة
+                </Button>
+              </AddCarDialog>
+            </div>
+          </>
         )}
 
         {cars.length === 0 ? (
           // Empty State
-          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-            <div className="w-24 h-24 rounded-2xl gradient-gold flex items-center justify-center mb-6 animate-float gold-glow">
-              <Car className="w-12 h-12 text-primary-foreground" />
+          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
+            <div className="w-28 h-28 rounded-3xl gradient-gold flex items-center justify-center mb-8 animate-float gold-glow">
+              <Car className="w-14 h-14 text-primary-foreground" />
             </div>
-            <h2 className="text-2xl font-bold mb-2 font-tajawal">مرحباً بك في المرآب!</h2>
-            <p className="text-muted-foreground mb-6 max-w-sm">
+            <h2 className="text-2xl font-bold mb-3 font-tajawal">مرحباً بك في المرآب!</h2>
+            <p className="text-muted-foreground mb-8 max-w-sm leading-relaxed">
               أضف سيارتك الأولى وخليها تحت عينك دايماً. نذكرك بكل شي من التأمين للزيت!
             </p>
-            <AddCarDialog onAdd={addCar} />
+            <AddCarDialog onAdd={addCar}>
+              <Button className="h-14 px-8 text-lg font-bold gradient-gold text-primary-foreground rounded-2xl shadow-lg gold-glow hover:scale-[1.02] transition-transform">
+                <Plus className="w-6 h-6 ml-2" />
+                أضف سيارتك الأولى
+              </Button>
+            </AddCarDialog>
           </div>
         ) : (
           // Cars Grid
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">سياراتي ({cars.length})</h2>
-              <AddCarDialog onAdd={addCar} />
-            </div>
+          <div className="space-y-4">
+            <h2 className="text-lg font-bold">سياراتي</h2>
             
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {cars.map((car, index) => (
@@ -452,6 +426,7 @@ const Index = () => {
                     car={car}
                     notifications={notifications}
                     onClick={() => setSelectedCar(car)}
+                    onDelete={() => handleDeleteCar(car)}
                   />
                 </div>
               ))}
@@ -459,10 +434,10 @@ const Index = () => {
 
             {/* Quick Notifications Preview */}
             {notifications.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <Bell className="w-5 h-5 text-primary" />
-                  تنبيهات عاجلة
+              <div className="mt-6 p-4 bg-destructive/5 border border-destructive/20 rounded-2xl">
+                <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-destructive">
+                  <Bell className="w-5 h-5" />
+                  تنبيهات عاجلة ({notifications.length})
                 </h3>
                 <NotificationCenter notifications={notifications.slice(0, 3)} showHeader={false} />
               </div>
@@ -470,6 +445,30 @@ const Index = () => {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 font-tajawal text-right">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold">حذف السيارة</AlertDialogTitle>
+            <AlertDialogDescription className="text-base pt-2 text-muted-foreground">
+              هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟ 
+              سيتم حذف جميع البيانات والسجلات المرتبطة بها نهائياً.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-row-reverse gap-3 mt-6">
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-red-600 text-white hover:bg-red-700 flex-1 py-6 text-lg font-bold"
+            >
+              نعم، احذف السيارة
+            </AlertDialogAction>
+            <AlertDialogCancel className="flex-1 mt-0 py-6 text-lg">
+              إلغاء
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Mileage Prompt */}
       <MileagePrompt
@@ -479,7 +478,12 @@ const Index = () => {
         onUpdate={updateMileage}
       />
 
-      
+      {/* Bottom Navigation */}
+      <BottomNav
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        notificationsCount={allNotifications.length}
+      />
     </div>
   );
 };

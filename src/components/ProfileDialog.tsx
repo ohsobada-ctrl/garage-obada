@@ -9,7 +9,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { User, Loader2, Save, Camera } from "lucide-react";
 
-export function ProfileDialog() {
+interface ProfileDialogProps {
+  children?: React.ReactNode;
+}
+
+export function ProfileDialog({ children }: ProfileDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -70,18 +74,20 @@ export function ProfileDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="flex items-center gap-2 text-right hover:opacity-80 transition-opacity">
-          <div className="hidden sm:block">
-            <p className="text-xs text-muted-foreground">الملف الشخصي</p>
-            <p className="text-sm font-bold truncate max-w-[100px]">{fullName || user?.phoneNumber || user?.phone || 'مستخدم'}</p>
-          </div>
-          <Avatar className="w-10 h-10 border-2 border-primary/20">
-            <AvatarImage src={avatarUrl} />
-            <AvatarFallback className="bg-primary/10 text-primary">
-              <User className="w-5 h-5" />
-            </AvatarFallback>
-          </Avatar>
-        </button>
+        {children ? children : (
+          <button className="flex items-center gap-2 text-right hover:opacity-80 transition-opacity">
+            <div className="hidden sm:block">
+              <p className="text-xs text-muted-foreground">الملف الشخصي</p>
+              <p className="text-sm font-bold truncate max-w-[100px]">{fullName || user?.phoneNumber || user?.phone || 'مستخدم'}</p>
+            </div>
+            <Avatar className="w-10 h-10 border-2 border-primary/20">
+              <AvatarImage src={avatarUrl} />
+              <AvatarFallback className="bg-primary/10 text-primary">
+                <User className="w-5 h-5" />
+              </AvatarFallback>
+            </Avatar>
+          </button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md font-tajawal">
         <DialogHeader>
