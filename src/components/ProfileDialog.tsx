@@ -70,7 +70,7 @@ export function ProfileDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="flex items-center gap-3 text-right hover:opacity-80 transition-opacity">
+        <button className="flex items-center gap-2 text-right hover:opacity-80 transition-opacity">
           <div className="hidden sm:block">
             <p className="text-xs text-muted-foreground">الملف الشخصي</p>
             <p className="text-sm font-bold truncate max-w-[100px]">{fullName || user?.phoneNumber || user?.phone || 'مستخدم'}</p>

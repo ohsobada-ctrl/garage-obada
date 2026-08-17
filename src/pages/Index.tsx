@@ -222,13 +222,13 @@ const Index = () => {
                 العودة للمرآب
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <Sheet>
                   <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="relative">
+                    <Button variant="outline" size="icon" className="relative rounded-full bg-background/50 hover:bg-secondary/50 border-border/50">
                       <Bell className="w-4 h-4" />
                       {carNotifications.length > 0 && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold shadow-sm">
                           {carNotifications.length}
                         </span>
                       )}
@@ -243,7 +243,14 @@ const Index = () => {
                     </div>
                   </SheetContent>
                 </Sheet>
-              </div>
+
+            <div className="flex items-center gap-2 bg-secondary/30 hover:bg-secondary/50 transition-colors border border-border/50 rounded-full py-1 px-1 pr-4">
+              <ProfileDialog />
+              <Button variant="ghost" size="icon" onClick={() => signOut()} className="w-8 h-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
             </div>
           </div>
         </header>
@@ -347,23 +354,22 @@ const Index = () => {
               </div>
               <h1 className="text-xl font-bold">المرآب</h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-4">
               <AdminDashboard carsCount={cars.length} />
-              <Button variant="ghost" size="icon" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive">
-                <LogOut className="w-5 h-5" />
-              </Button>
-              <ProfileDialog />
+              
+              <div className="hidden sm:block w-px h-8 bg-border/60 mx-1" />
+
               <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="relative">
-                  <Bell className="w-4 h-4" />
-                  {allNotifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
-                      {allNotifications.length}
-                    </span>
-                  )}
-                </Button>
-              </SheetTrigger>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" className="relative rounded-full bg-background/50 hover:bg-secondary/50 border-border/50">
+                    <Bell className="w-4 h-4" />
+                    {allNotifications.length > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold shadow-sm">
+                        {allNotifications.length}
+                      </span>
+                    )}
+                  </Button>
+                </SheetTrigger>
               <SheetContent side="left" className="w-full sm:max-w-md">
                 <SheetHeader>
                   <SheetTitle>مركز التنبيهات</SheetTitle>
