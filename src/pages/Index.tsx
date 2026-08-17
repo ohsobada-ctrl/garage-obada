@@ -244,13 +244,13 @@ const Index = () => {
                   </SheetContent>
                 </Sheet>
 
-            <div className="flex items-center gap-2 bg-secondary/30 hover:bg-secondary/50 transition-colors border border-border/50 rounded-full py-1 px-1 pr-4">
-              <ProfileDialog />
-              <Button variant="ghost" size="icon" onClick={() => signOut()} className="w-8 h-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+                <div className="flex items-center gap-2 bg-secondary/30 hover:bg-secondary/50 transition-colors border border-border/50 rounded-full py-1 px-1 pr-4">
+                  <ProfileDialog />
+                  <Button variant="ghost" size="icon" onClick={() => signOut()} className="w-8 h-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </header>
@@ -379,10 +379,17 @@ const Index = () => {
                 </div>
               </SheetContent>
             </Sheet>
+
+              <div className="flex items-center gap-2 bg-secondary/30 hover:bg-secondary/50 transition-colors border border-border/50 rounded-full py-1 px-1 pr-4">
+                <ProfileDialog />
+                <Button variant="ghost" size="icon" onClick={() => signOut()} className="w-8 h-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
       <main className="container pt-6">
         {cars.length > 0 && (
