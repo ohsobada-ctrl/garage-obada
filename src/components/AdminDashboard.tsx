@@ -66,43 +66,46 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // Broadcast form states
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [severity, setSeverity] = useState<"info" | "warning" | "danger">("info");
-  
-  // History & stats
-  const [broadcasts, setBroadcasts] = useState<BroadcastNotification[]>([]);
-  const [stats, setStats] = useState({
-    usersCount: 1,
-    carsCount: carsCount,
-    servicesCount: 0
-  });
+  // Delivery tracking metrics
+  const [deliveryReport, setDeliveryReport] = useState<{
+    notificationId: string;
+    totalConnected: number;
+    deliveredCount: number;
+    failedCount: number;
+    recipients: { email: string; timestamp: string }[];
+  } | null>(null);
 
   useEffect(() => {
-    if (open) {
-      loadAdminData();
-    }
-  }, [open, carsCount]);
+    if (!open) return;
 
-  async function loadAdminData() {
-    setBroadcasts(getBroadcastNotifications());
-    
-    // Attempt fetching live counts from Supabase if accessible
-    try {
-      const { count: usersC } = await supabase.from("profiles").select("*", { count: 'exact', head: true });
-      const { count: carsC } = await supabase.from("cars").select("*", { count: 'exact', head: true });
-      
-      setStats({
-        usersCount: usersC || 1,
-        carsCount: carsC || carsCount || 1,
-        servicesCount: (carsC || 1) * 3
-      });
-    } catch (e) {
-      // Fallback
-      setStats(prev => ({ ...prev, carsCount: carsCount || prev.carsCount }));
-    }
-  }
+    // Listen to delivery ACK responses from connected devices
+    const channel = supabase
+      .channel('garage_global_broadcasts')
+      .on('broadcast', { event: 'ack_admin_notification' }, (payload) => {
+        if (payload.payload) {
+          const { notificationId, userEmail, timestamp } = payload.payload;
+          setDeliveryReport(prev => {
+            if (!prev || prev.notificationId !== notificationId) return prev;
+            if (prev.recipients.some(r => r.email === userEmail)) return prev;
+
+            const updatedRecipients = [...prev.recipients, { email: userEmail, timestamp }];
+            const newDelivered = updatedRecipients.length;
+            const newFailed = Math.max(0, prev.totalConnected - newDelivered);
+            return {
+              ...prev,
+              deliveredCount: newDelivered,
+              failedCount: newFailed,
+              recipients: updatedRecipients,
+            };
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [open]);
 
   const handleSendBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +124,16 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
         createdAt: new Date().toISOString(),
         senderName: user?.email || "إدارة كراج"
       };
+
+      // Calculate total registered/active users to compare against live ACK
+      const totalTargetUsers = Math.max(stats.usersCount, 1);
+      setDeliveryReport({
+        notificationId: newNotification.id,
+        totalConnected: totalTargetUsers,
+        deliveredCount: 1, // Sender device receives immediately
+        failedCount: Math.max(0, totalTargetUsers - 1),
+        recipients: [{ email: user?.email || "إدارة كراج", timestamp: new Date().toLocaleTimeString("ar-LY") }],
+      });
 
       // 1. Save locally
       saveBroadcastNotification(newNotification);
@@ -168,7 +181,7 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
         } catch (_) {}
       }
 
-      toast.success("تم إرسال الإشعار لجميع المستخدمين بنجاح! 🚀");
+      toast.success("تم إرسال الإشعار وبدء تتبع الاستلام فوراً! 🚀");
       setTitle("");
       setBody("");
       setSeverity("info");
@@ -324,6 +337,52 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
                     إرسال الإشعار لجميع المستخدمين
                   </Button>
                 </form>
+
+                {/* Live Delivery Report Box */}
+                {deliveryReport && (
+                  <div className="mt-4 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-black text-sm flex items-center gap-2 text-amber-400">
+                        <CheckCircle2 className="w-4 h-4 text-green-400" />
+                        تقرير تسليم الإشعار الفوري
+                      </h4>
+                      <Badge variant="outline" className="bg-amber-500/20 text-amber-300 text-xs">
+                        مباشر 🟢
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="p-2 rounded-lg bg-green-500/20 border border-green-500/30">
+                        <div className="font-bold text-green-400 text-lg">{deliveryReport.deliveredCount}</div>
+                        <div className="text-muted-foreground">وصل بنجاح ✅</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/30">
+                        <div className="font-bold text-red-400 text-lg">{deliveryReport.failedCount}</div>
+                        <div className="text-muted-foreground">لم يتسلم بعد ❌</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-blue-500/20 border border-blue-500/30">
+                        <div className="font-bold text-blue-400 text-lg">
+                          {Math.round((deliveryReport.deliveredCount / Math.max(1, deliveryReport.totalConnected)) * 100)}%
+                        </div>
+                        <div className="text-muted-foreground">نسبة الوصول 📊</div>
+                      </div>
+                    </div>
+
+                    {deliveryReport.recipients.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        <div className="text-xs font-bold text-muted-foreground">قائمة المستلمين الذين تأكد وصول الإشعار إليهم:</div>
+                        <div className="max-h-24 overflow-y-auto space-y-1 text-xs">
+                          {deliveryReport.recipients.map((rec, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-1.5 rounded bg-background/50 text-xs">
+                              <span className="font-mono text-amber-200">{rec.email}</span>
+                              <span className="text-muted-foreground text-[10px]">{rec.timestamp}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 

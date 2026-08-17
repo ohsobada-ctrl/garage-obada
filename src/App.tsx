@@ -51,6 +51,20 @@ const App = () => {
 
           saveBroadcastNotification(item);
 
+          // Send delivery ACK back to channel for admin metrics tracking
+          try {
+            const savedEmail = localStorage.getItem("garage_user_email") || "زائر";
+            channel.send({
+              type: 'broadcast',
+              event: 'ack_admin_notification',
+              payload: {
+                notificationId: item.id,
+                userEmail: savedEmail,
+                timestamp: new Date().toISOString()
+              }
+            }).catch(() => {});
+          } catch (_) {}
+
           // Trigger native notification with sound or browser alert
           if (Capacitor.isNativePlatform()) {
             let numericId = 1000;
