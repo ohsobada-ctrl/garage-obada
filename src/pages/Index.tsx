@@ -37,18 +37,18 @@ import type { Notification } from '@/types/car';
 
 const Index = () => {
   const { user, signOut } = useAuth();
-  const { 
-    cars, 
-    isLoaded, 
-    addCar, 
+  const {
+    cars,
+    isLoaded,
+    addCar,
     deleteCar,
-    addLegalDoc, 
-    addOilService, 
+    addLegalDoc,
+    addOilService,
     addBrakeTireService,
     updateMileage,
     updateCarSettings,
   } = useCarsSupabase();
-  
+
   const notifications = useNotifications(cars);
   const [broadcasts, setBroadcasts] = useState<Notification[]>([]);
   const [selectedCar, setSelectedCar] = useState<CarType | null>(null);
@@ -150,16 +150,16 @@ const Index = () => {
               tag: 'garage-active-alerts',
             }).catch(() => {
               // SW failed — fallback to direct (desktop only)
-              try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) {}
+              try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) { }
             });
           } else {
             // No SW registered — try direct (desktop only, Android may throw)
-            try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) {}
+            try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) { }
           }
-        }).catch(() => {});
+        }).catch(() => { });
       } else {
         // No service worker support — desktop fallback
-        try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) {}
+        try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) { }
       }
 
       localStorage.setItem(shownKey, JSON.stringify([
@@ -216,8 +216,8 @@ const Index = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <SideDrawer carsCount={cars.length} />
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => setSelectedCar(null)}
                   className="gap-2 font-bold hover:bg-secondary/50"
@@ -293,7 +293,7 @@ const Index = () => {
           </Card>
 
           {/* Sections */}
-          <LegalVault 
+          <LegalVault
             documents={car.legalDocs}
             onAdd={(doc) => addLegalDoc(car.id, doc)}
           />
@@ -312,29 +312,29 @@ const Index = () => {
             onAdd={(service) => addBrakeTireService(car.id, service)}
             onUpdateSettings={(settings) => updateCarSettings(car.id, settings)}
           />
-                  {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-  <AlertDialogContent className="fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 font-tajawal text-right">
-    <AlertDialogHeader>
-      <AlertDialogTitle className="text-xl font-bold">حذف السيارة</AlertDialogTitle>
-      <AlertDialogDescription className="text-base pt-2 text-muted-foreground">
-        هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟ 
-        سيتم حذف جميع البيانات والسجلات المرتبطة بها نهائياً.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter className="flex flex-row-reverse gap-3 mt-6">
-      <AlertDialogAction 
-        onClick={confirmDelete} 
-        className="bg-red-600 text-white hover:bg-red-700 flex-1 py-6 text-lg font-bold"
-      >
-        نعم، احذف السيارة
-      </AlertDialogAction>
-      <AlertDialogCancel className="flex-1 mt-0 py-6 text-lg">
-        إلغاء
-      </AlertDialogCancel>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent className="fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 font-tajawal text-right">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl font-bold">حذف السيارة</AlertDialogTitle>
+                <AlertDialogDescription className="text-base pt-2 text-muted-foreground">
+                  هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟
+                  سيتم حذف جميع البيانات والسجلات المرتبطة بها نهائياً.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex flex-row-reverse gap-3 mt-6">
+                <AlertDialogAction
+                  onClick={confirmDelete}
+                  className="bg-red-600 text-white hover:bg-red-700 flex-1 py-6 text-lg font-bold"
+                >
+                  نعم، احذف السيارة
+                </AlertDialogAction>
+                <AlertDialogCancel className="flex-1 mt-0 py-6 text-lg">
+                  إلغاء
+                </AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </main>
       </div>
     );
@@ -380,7 +380,7 @@ const Index = () => {
         {cars.length > 0 && (
           <>
             <StatsGrid cars={cars} notifications={notifications} />
-            
+
             <div className="mb-6">
               <AddCarDialog onAdd={addCar}>
                 <Button className="w-full h-14 text-lg font-bold gradient-gold text-primary-foreground rounded-2xl shadow-lg gold-glow hover:scale-[1.02] transition-transform">
@@ -413,7 +413,7 @@ const Index = () => {
           // Cars Grid
           <div className="space-y-4">
             <h2 className="text-lg font-bold">سياراتي</h2>
-            
+
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {cars.map((car, index) => (
                 <div key={car.id} style={{ animationDelay: `${index * 100}ms` }}>
@@ -447,13 +447,13 @@ const Index = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold">حذف السيارة</AlertDialogTitle>
             <AlertDialogDescription className="text-base pt-2 text-muted-foreground">
-              هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟ 
+              هل أنت متأكد من حذف {carToDelete?.make} {carToDelete?.model}؟
               سيتم حذف جميع البيانات والسجلات المرتبطة بها نهائياً.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row-reverse gap-3 mt-6">
-            <AlertDialogAction 
-              onClick={confirmDelete} 
+            <AlertDialogAction
+              onClick={confirmDelete}
               className="bg-red-600 text-white hover:bg-red-700 flex-1 py-6 text-lg font-bold"
             >
               نعم، احذف السيارة

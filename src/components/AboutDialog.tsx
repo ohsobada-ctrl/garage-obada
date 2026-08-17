@@ -52,8 +52,8 @@ export function AboutDialog({ children }: AboutDialogProps) {
               <span>العربية (RTL)</span>
             </div>
             <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/20">
-              <span className="font-medium text-foreground">الوضع البصري</span>
-              <span>الوضع الداكن (Dark Mode)</span>
+              <span className="font-medium text-foreground">المبرمج</span>
+              <span>Obada</span>
             </div>
           </div>
         </div>
