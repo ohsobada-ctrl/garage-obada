@@ -16,8 +16,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true;
     }
     const stored = localStorage.getItem("garage_is_admin");
-    // If explicitly set in localStorage allow it, otherwise default to true if email matches or if no email is set yet
-    return stored === "true" || (stored === null && (!userEmail || userEmail.toLowerCase().trim() === adminEmail));
+    return stored === "true";
   };
 
   const toggleAdmin = (status?: boolean) => {

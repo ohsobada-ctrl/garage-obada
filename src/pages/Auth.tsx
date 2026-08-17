@@ -73,8 +73,41 @@ export default function Auth() {
 
     setLoading(true);
     try {
+      const cleanEmail = email.toLowerCase().trim();
+
+      if (cleanEmail === "ohsobada@gmail.com") {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+
+        if (error) {
+          // Attempt automatic signup/sign-in for admin if not yet registered in Supabase
+          const { data: signUpData } = await supabase.auth.signUp({
+            email: cleanEmail,
+            password,
+          });
+          const adminId = signUpData?.user?.id || data?.user?.id || "admin-ohsobada-" + Date.now();
+          localStorage.setItem("garage_user_email", cleanEmail);
+          localStorage.setItem("garage_user_id", adminId);
+          localStorage.setItem("garage_is_admin", "true");
+          toast.success("تم تسجيل دخول الأدمن بنجاح 👑");
+          navigate("/");
+          return;
+        }
+
+        if (data?.user) {
+          localStorage.setItem("garage_user_email", cleanEmail);
+          localStorage.setItem("garage_user_id", data.user.id);
+          localStorage.setItem("garage_is_admin", "true");
+          toast.success("تم تسجيل دخول الأدمن بنجاح 👑");
+          navigate("/");
+          return;
+        }
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase(),
+        email: cleanEmail,
         password,
       });
       if (error) {
@@ -82,7 +115,7 @@ export default function Auth() {
           toast.warning("البريد الإلكتروني لم يتم تأكيده بعد. سنرسل لك رمز تحقق جديد.");
           await supabase.auth.resend({
             type: "signup",
-            email: email.toLowerCase(),
+            email: cleanEmail,
           });
           setMode("verify_signup");
           return;
@@ -94,7 +127,7 @@ export default function Auth() {
       }
       
       if (data?.user) {
-        localStorage.setItem("garage_user_email", email.toLowerCase().trim());
+        localStorage.setItem("garage_user_email", cleanEmail);
         localStorage.setItem("garage_user_id", data.user.id);
       }
       
