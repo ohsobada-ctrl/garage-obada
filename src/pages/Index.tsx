@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Car, Bell, Plus, ChevronLeft, Gauge, Trash2, ShieldCheck } from 'lucide-react';
+import { Car, Bell, Plus, ArrowRight, Gauge, Trash2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NotificationService } from "@/services/notificationService";
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +8,6 @@ import { AddCarDialog } from '@/components/AddCarDialog';
 import { CarCard } from '@/components/CarCard';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { SideDrawer } from '@/components/SideDrawer';
-import { BottomNav } from '@/components/BottomNav';
 import { StatsGrid } from '@/components/StatsGrid';
 import { LegalVault } from '@/components/LegalVault';
 import { OilService } from '@/components/OilService';
@@ -56,7 +55,6 @@ const Index = () => {
   const [showMileagePrompt, setShowMileagePrompt] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [carToDelete, setCarToDelete] = useState<CarType | null>(null);
-  const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
     const syncBroadcasts = () => {
@@ -216,20 +214,24 @@ const Index = () => {
         <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
           <div className="container py-4">
             <div className="flex items-center justify-between">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setSelectedCar(null)}
-                className="gap-2"
-              >
-                العودة للمرآب
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-3">
+                <SideDrawer carsCount={cars.length} />
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setSelectedCar(null)}
+                  className="gap-2 font-bold hover:bg-secondary/50"
+                >
+                  <ArrowRight className="w-4 h-4 text-primary" />
+                  العودة للمرآب
+                </Button>
+              </div>
+
               <div className="flex items-center gap-2 sm:gap-4">
                 <Sheet>
                   <SheetTrigger asChild>
                     <Button variant="outline" size="icon" className="relative rounded-full bg-background/50 hover:bg-secondary/50 border-border/50">
-                      <Bell className="w-4 h-4" />
+                      <Bell className="w-5 h-5" />
                       {carNotifications.length > 0 && (
                         <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold shadow-sm">
                           {carNotifications.length}
@@ -246,13 +248,6 @@ const Index = () => {
                     </div>
                   </SheetContent>
                 </Sheet>
-
-                <div className="flex items-center gap-2 bg-secondary/30 hover:bg-secondary/50 transition-colors border border-border/50 rounded-full py-1 px-1 pr-4">
-                  <ProfileDialog />
-                  <Button variant="ghost" size="icon" onClick={() => signOut()} className="w-8 h-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                </div>
               </div>
             </div>
           </div>
@@ -476,13 +471,6 @@ const Index = () => {
         open={showMileagePrompt}
         onClose={() => setShowMileagePrompt(false)}
         onUpdate={updateMileage}
-      />
-
-      {/* Bottom Navigation */}
-      <BottomNav
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
-        notificationsCount={allNotifications.length}
       />
     </div>
   );

@@ -4,6 +4,8 @@ import { User, ShieldCheck, Settings, Info, LogOut, Car as CarIcon, ChevronLeft 
 import { useAuth } from "@/lib/auth";
 import { ProfileDialog } from "./ProfileDialog";
 import { AdminDashboard } from "./AdminDashboard";
+import { SettingsDialog } from "./SettingsDialog";
+import { AboutDialog } from "./AboutDialog";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -106,25 +108,29 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
             </AdminDashboard>
           )}
 
-          <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-secondary/40 transition-colors text-right group">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors">
-                <Settings className="w-4 h-4" />
+          <SettingsDialog>
+            <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-secondary/40 transition-colors text-right group">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors">
+                  <Settings className="w-4 h-4" />
+                </div>
+                <span className="font-medium text-sm">الإعدادات</span>
               </div>
-              <span className="font-medium text-sm">الإعدادات</span>
-            </div>
-            <ChevronLeft className="w-4 h-4 text-muted-foreground/50" />
-          </button>
+              <ChevronLeft className="w-4 h-4 text-muted-foreground/50" />
+            </button>
+          </SettingsDialog>
 
-          <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-secondary/40 transition-colors text-right group">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors">
-                <Info className="w-4 h-4" />
+          <AboutDialog>
+            <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-secondary/40 transition-colors text-right group">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors">
+                  <Info className="w-4 h-4" />
+                </div>
+                <span className="font-medium text-sm">عن التطبيق</span>
               </div>
-              <span className="font-medium text-sm">عن التطبيق</span>
-            </div>
-            <ChevronLeft className="w-4 h-4 text-muted-foreground/50" />
-          </button>
+              <ChevronLeft className="w-4 h-4 text-muted-foreground/50" />
+            </button>
+          </AboutDialog>
 
         </div>
 
