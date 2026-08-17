@@ -32,13 +32,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const App = () => {
   useEffect(() => {
-    // Wrap ALL notification init in try-catch to prevent iOS Safari crash
+    // Only initialize push permissions silently on Native Android, avoid Web/iOS Safari prompt blocking
     try {
-      NotificationService.createChannel().catch(() => {});
-      NotificationService.requestPermissions().catch(() => {});
-      NotificationService.initPushNotifications().catch(() => {});
+      if (Capacitor.isNativePlatform()) {
+        NotificationService.createChannel().catch(() => {});
+        NotificationService.requestPermissions().catch(() => {});
+        NotificationService.initPushNotifications().catch(() => {});
+      }
     } catch (_) {
-      // Silently ignore — iOS Safari doesn't support these APIs
+      // Silently ignore
     }
 
     // Top-level global broadcast listener for ALL devices/users (guest or logged-in)
