@@ -16,7 +16,7 @@ export const NotificationService = {
   async requestPermissions() {
     try {
       if (Capacitor.getPlatform() === 'web') {
-        if (!('Notification' in window)) {
+        if (typeof window === 'undefined' || !('Notification' in window) || typeof Notification === 'undefined') {
           console.warn('This browser does not support desktop notification');
           return 'denied';
         }
@@ -39,7 +39,7 @@ export const NotificationService = {
 
   async registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
     try {
-      if (!('serviceWorker' in navigator)) return null;
+      if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null;
       const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       console.log('Service Worker registered:', reg.scope);
       return reg;
@@ -55,9 +55,7 @@ export const NotificationService = {
       
       if (!isPushSupported && Capacitor.getPlatform() === 'web') {
         // Fallback for web if plugin not available or on plain web
-        if (Notification.permission === 'granted') {
-          // Web notifications don't support future scheduling in the same way as native without Service Workers
-          // But we can show an immediate one to confirm it works
+        if (typeof window !== 'undefined' && 'Notification' in window && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           new Notification('تذكير صيانة', {
             body: `تم تفعيل تذكيرات الصيانة لـ ${carName}`,
             icon: '/favicon.ico'
@@ -191,7 +189,7 @@ export const NotificationService = {
 
       // --- Web: delegate scheduling to Service Worker ---
       if (Capacitor.getPlatform() === 'web') {
-        if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
+        if (typeof window === 'undefined' || typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window) || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 
         let reg = await navigator.serviceWorker.getRegistration('/');
         if (!reg) reg = await NotificationService.registerServiceWorker() ?? undefined;

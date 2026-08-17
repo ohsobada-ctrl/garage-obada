@@ -84,7 +84,7 @@ const App = () => {
                 autoCancel: true,
               }]
             }).catch(() => {});
-          } else if ('Notification' in window && Notification.permission === 'granted') {
+          } else if (typeof window !== 'undefined' && 'Notification' in window && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             try {
               new Notification(`📢 ${item.title}`, {
                 body: item.body,

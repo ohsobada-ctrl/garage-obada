@@ -209,7 +209,7 @@ export function AdminDashboard({ carsCount = 0 }: AdminDashboardProps) {
       } catch (_) {}
 
       // 4. Trigger native or browser notification for sender
-      if ('Notification' in window && Notification.permission === 'granted') {
+      if (typeof window !== 'undefined' && 'Notification' in window && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         try {
           new Notification(`📢 ${newNotification.title}`, {
             body: newNotification.body,

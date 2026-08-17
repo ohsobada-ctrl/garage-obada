@@ -126,7 +126,7 @@ const Index = () => {
     }
 
     // --- Browser notifications: only for unseen alerts ---
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (typeof window === 'undefined' || !('Notification' in window) || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 
     try {
       const shownKey = 'garage-shown-alerts';
