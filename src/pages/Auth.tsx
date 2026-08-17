@@ -74,42 +74,13 @@ export default function Auth() {
     setLoading(true);
     try {
       const cleanEmail = email.toLowerCase().trim();
-
-      if (cleanEmail === "ohsobada@gmail.com") {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password,
-        });
-
-        if (error) {
-          // Attempt automatic signup/sign-in for admin if not yet registered in Supabase
-          const { data: signUpData } = await supabase.auth.signUp({
-            email: cleanEmail,
-            password,
-          });
-          const adminId = signUpData?.user?.id || data?.user?.id || "admin-ohsobada-" + Date.now();
-          localStorage.setItem("garage_user_email", cleanEmail);
-          localStorage.setItem("garage_user_id", adminId);
-          localStorage.setItem("garage_is_admin", "true");
-          toast.success("تم تسجيل دخول الأدمن بنجاح 👑");
-          navigate("/");
-          return;
-        }
-
-        if (data?.user) {
-          localStorage.setItem("garage_user_email", cleanEmail);
-          localStorage.setItem("garage_user_id", data.user.id);
-          localStorage.setItem("garage_is_admin", "true");
-          toast.success("تم تسجيل دخول الأدمن بنجاح 👑");
-          navigate("/");
-          return;
-        }
-      }
+      const isAdminEmail = cleanEmail === "ohsobada@gmail.com";
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password,
       });
+
       if (error) {
         if (error.message.includes("Email not confirmed")) {
           toast.warning("البريد الإلكتروني لم يتم تأكيده بعد. سنرسل لك رمز تحقق جديد.");
@@ -129,11 +100,14 @@ export default function Auth() {
       if (data?.user) {
         localStorage.setItem("garage_user_email", cleanEmail);
         localStorage.setItem("garage_user_id", data.user.id);
+        if (isAdminEmail) {
+          localStorage.setItem("garage_is_admin", "true");
+        }
       }
       
       // حفظ خيار تذكرني
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
-      toast.success("تم تسجيل الدخول بنجاح");
+      toast.success(isAdminEmail ? "تم تسجيل دخول الأدمن بنجاح 👑" : "تم تسجيل الدخول بنجاح");
       navigate("/");
     } catch (error: any) {
       toast.error(error.message);

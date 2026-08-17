@@ -32,9 +32,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const App = () => {
   useEffect(() => {
-    NotificationService.createChannel();
-    NotificationService.requestPermissions();
-    NotificationService.initPushNotifications();
+    // Wrap ALL notification init in try-catch to prevent iOS Safari crash
+    try {
+      NotificationService.createChannel().catch(() => {});
+      NotificationService.requestPermissions().catch(() => {});
+      NotificationService.initPushNotifications().catch(() => {});
+    } catch (_) {
+      // Silently ignore — iOS Safari doesn't support these APIs
+    }
 
     // Top-level global broadcast listener for ALL devices/users (guest or logged-in)
     const processedIds = new Set<string>();

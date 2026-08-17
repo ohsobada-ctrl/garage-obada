@@ -96,12 +96,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        localStorage.removeItem("garage_user_id");
-        localStorage.removeItem("garage_user_email");
-        localStorage.removeItem("garage_user_phone");
-        localStorage.removeItem("garage_is_admin");
+        // Only wipe localStorage if user explicitly signs out
+        // Check if this is a real sign-out vs initial load with no session
+        const hadSession = !!localStorage.getItem("garage_user_id");
+        if (hadSession) {
+          localStorage.removeItem("garage_user_id");
+          localStorage.removeItem("garage_user_email");
+          localStorage.removeItem("garage_user_phone");
+          localStorage.removeItem("garage_is_admin");
+        }
         setUser(null);
         setLoading(false);
+        return;
+      }
+
+      if (event === 'INITIAL_SESSION' && !session) {
+        // No Supabase session on startup — try localStorage fallback
+        restoreUserSession();
         return;
       }
 
@@ -117,10 +128,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
     localStorage.removeItem("garage_user_phone");
     localStorage.removeItem("garage_user_id");
+    localStorage.removeItem("garage_user_email");
+    localStorage.removeItem("garage_is_admin");
     setUser(null);
+    try {
+      await supabase.auth.signOut();
+    } catch (_) {}
   };
 
   return (
