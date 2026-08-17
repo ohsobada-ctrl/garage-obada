@@ -16,31 +16,8 @@ interface SideDrawerProps {
 
 export function SideDrawer({ carsCount }: SideDrawerProps) {
   const { user, signOut } = useAuth();
-  const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
-
-  // First time auto-hint onboarding animation
-  useEffect(() => {
-    try {
-      const hasSeenHint = localStorage.getItem("garage_has_seen_menu_hint");
-      if (!hasSeenHint) {
-        const timerOpen = setTimeout(() => {
-          setOpen(true);
-        }, 1200);
-
-        const timerClose = setTimeout(() => {
-          setOpen(false);
-          localStorage.setItem("garage_has_seen_menu_hint", "true");
-        }, 2800);
-
-        return () => {
-          clearTimeout(timerOpen);
-          clearTimeout(timerClose);
-        };
-      }
-    } catch (_) {}
-  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -70,9 +47,9 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet>
       <SheetTrigger asChild>
-        <button className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center animate-glow-pulse hover:scale-105 active:scale-90 transition-transform duration-200 group">
+        <button className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center animate-slow-pulse hover:scale-105 active:scale-90 transition-transform duration-200 group">
           <CarIcon className="w-5 h-5 text-primary-foreground transition-transform group-active:scale-95" />
         </button>
       </SheetTrigger>
