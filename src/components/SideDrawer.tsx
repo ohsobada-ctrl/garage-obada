@@ -72,14 +72,8 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="relative w-10 h-10 rounded-xl gradient-gold flex items-center justify-center gold-glow-sm hover:scale-105 active:scale-90 transition-transform duration-200 group">
+        <button className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center animate-glow-pulse hover:scale-105 active:scale-90 transition-transform duration-200 group">
           <CarIcon className="w-5 h-5 text-primary-foreground transition-transform group-active:scale-95" />
-          
-          {/* Subtle pulsing gold indicator dot on corner */}
-          <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-400 border-2 border-background shadow-sm"></span>
-          </span>
         </button>
       </SheetTrigger>
       <SheetContent side="right" className="w-[85vw] sm:w-[350px] font-tajawal p-0 flex flex-col bg-background/95 backdrop-blur-xl border-l-border/30">
