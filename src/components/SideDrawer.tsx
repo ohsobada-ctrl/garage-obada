@@ -16,8 +16,31 @@ interface SideDrawerProps {
 
 export function SideDrawer({ carsCount }: SideDrawerProps) {
   const { user, signOut } = useAuth();
+  const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+
+  // First time auto-hint onboarding animation
+  useEffect(() => {
+    try {
+      const hasSeenHint = localStorage.getItem("garage_has_seen_menu_hint");
+      if (!hasSeenHint) {
+        const timerOpen = setTimeout(() => {
+          setOpen(true);
+        }, 1200);
+
+        const timerClose = setTimeout(() => {
+          setOpen(false);
+          localStorage.setItem("garage_has_seen_menu_hint", "true");
+        }, 2800);
+
+        return () => {
+          clearTimeout(timerOpen);
+          clearTimeout(timerClose);
+        };
+      }
+    } catch (_) {}
+  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -47,10 +70,16 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
   };
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center gold-glow-sm hover:scale-105 transition-transform">
-          <CarIcon className="w-5 h-5 text-primary-foreground" />
+        <button className="relative w-10 h-10 rounded-xl gradient-gold flex items-center justify-center gold-glow-sm hover:scale-105 active:scale-90 transition-transform duration-200 group">
+          <CarIcon className="w-5 h-5 text-primary-foreground transition-transform group-active:scale-95" />
+          
+          {/* Subtle pulsing gold indicator dot on corner */}
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-400 border-2 border-background shadow-sm"></span>
+          </span>
         </button>
       </SheetTrigger>
       <SheetContent side="right" className="w-[85vw] sm:w-[350px] font-tajawal p-0 flex flex-col bg-background/95 backdrop-blur-xl border-l-border/30">
