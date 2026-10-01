@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { backendError } from '@/lib/backendError';
 
 type Report = { users: number; cars: number; devices: number; broadcasts: { id: string; title: string; body: string; created_at: string; recipients: number; opened: number; accepted: number; pending: number; failed: number }[] };
 export function AdminDashboard({ children }: { carsCount?: number; children?: React.ReactNode }) {
@@ -23,7 +24,7 @@ export function AdminDashboard({ children }: { carsCount?: number; children?: Re
   const request = useRef<{ id: string; content: string }>();
   const refresh = async () => {
     const { data, error } = await supabase.rpc('garage_admin_report');
-    if (error) { setError('تعذر تحميل الإحصائيات. تأكد من الاتصال وصلاحيات الحساب وتحديث قاعدة البيانات.'); return; }
+    if (error) { setError(backendError(error, 'تعذر تحميل الإحصائيات')); return; }
     setError(''); setReport(data as Report);
   };
   useEffect(() => {
@@ -49,7 +50,10 @@ export function AdminDashboard({ children }: { carsCount?: number; children?: Re
           if (error) throw error;
           toast.success('تم حفظ الإشعار لكل الحسابات وإضافته لطابور إرسال الأجهزة');
           request.current = undefined; setTitle(''); setBody(''); await refresh();
-        } catch (e) { toast.error(e instanceof Error ? e.message : 'تعذر الإرسال. أعد المحاولة'); }
+        } catch (e) {
+          const detail = backendError(e as { code?: string; message?: string }, 'تعذر إرسال الإشعار');
+          setError(detail); toast.error(detail);
+        }
         finally { setSending(false); }
       }}>
         <Label htmlFor="broadcast-title">عنوان الإشعار</Label><Input id="broadcast-title" required maxLength={120} value={title} onChange={e => setTitle(e.target.value)} />

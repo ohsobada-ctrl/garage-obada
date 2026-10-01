@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notification } from '@/types/car';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface NotificationCenterProps {
   notifications: Notification[];
@@ -77,6 +79,10 @@ export function NotificationCenter({ notifications, onClose, showHeader = true }
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm text-foreground">{notification.carName}</p>
                 <p className="text-sm mt-1">{notification.message}</p>
+                {notification.carId === 'system' && <Button variant="ghost" size="sm" onClick={async () => {
+                  const { error } = await supabase.from('notification_inbox').update({ read_at: new Date().toISOString() }).eq('id', notification.id);
+                  if (error) toast.error('تعذر تأكيد القراءة'); else toast.success('تم تأكيد قراءة الإشعار');
+                }}>تأكيد القراءة</Button>}
               </div>
             </div>
           ))}

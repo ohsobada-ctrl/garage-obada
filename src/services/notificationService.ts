@@ -50,11 +50,15 @@ export const NotificationService = {
       await NotificationService.createChannel();
       await registerNative();
     } else {
+      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
+      if (ios && !standalone) throw new Error('على آيفون: افتح الموقع في Safari ← مشاركة ← إضافة إلى الشاشة الرئيسية. افتح أيقونة كراج ثم فعّل الإشعارات. يلزم iOS 16.4 أو أحدث');
+      if (!window.isSecureContext) throw new Error('إشعارات الخلفية تحتاج رابط HTTPS آمن');
       if (!('Notification' in window) || !('PushManager' in window)) throw new Error('المتصفح لا يدعم Push. على آيفون ثبّت التطبيق على الشاشة الرئيسية أولاً');
-      const permission = prompt ? await Notification.requestPermission() : Notification.permission;
-      if (permission !== 'granted') throw new Error('اسمح بالإشعارات من إعدادات المتصفح');
       const key = import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY;
-      if (!key) throw new Error('خدمة Push لم تُجهّز على الخادم بعد');
+      if (!key) throw new Error('إعداد إشعارات الموقع ناقص: يلزم ضبط VITE_WEB_PUSH_PUBLIC_KEY وإعادة نشر الموقع');
+      const permission = prompt ? await Notification.requestPermission() : Notification.permission;
+      if (permission !== 'granted') throw new Error('اسمح بالإشعارات من إعدادات الجهاز أو المتصفح، ثم أعد المحاولة');
       const reg = await NotificationService.registerServiceWorker();
       let subscription = await reg.pushManager.getSubscription();
       if (!subscription) {

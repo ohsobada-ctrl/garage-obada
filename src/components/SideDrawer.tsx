@@ -7,6 +7,7 @@ import { AdminDashboard } from "./AdminDashboard";
 import { SettingsDialog } from "./SettingsDialog";
 import { AboutDialog } from "./AboutDialog";
 import { useEffect, useState } from "react";
+import { toast } from 'sonner';
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -20,7 +21,7 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
   const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.uid) {
       loadProfile();
     }
   }, [user]);
@@ -30,7 +31,7 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user?.id)
+        .eq('id', user?.uid)
         .single();
       
       if (data) {
@@ -42,8 +43,8 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
     }
   }
 
-  const handleSignOut = () => {
-    signOut();
+  const handleSignOut = async () => {
+    try { await signOut(); } catch { toast.error('تعذر تسجيل الخروج بأمان. تحقق من الاتصال وحاول مجدداً'); }
   };
 
   return (
