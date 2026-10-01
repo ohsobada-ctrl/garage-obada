@@ -12,6 +12,8 @@ import { StatsGrid } from '@/components/StatsGrid';
 import { LegalVault } from '@/components/LegalVault';
 import { OilService } from '@/components/OilService';
 import { BrakesTires } from '@/components/BrakesTires';
+import { CustomReminders } from '@/components/CustomReminders';
+import { useInbox } from '@/hooks/useInbox';
 import { MileagePrompt } from '@/components/MileagePrompt';
 import { MileageEditor } from '@/components/MileageEditor';
 import { useCarsSupabase } from '@/hooks/useCarsSupabase';
@@ -32,7 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { supabase } from "@/integrations/supabase/client";
-import { getBroadcastNotifications, saveBroadcastNotification } from '@/components/AdminDashboard';
+
 import type { Notification } from '@/types/car';
 
 const Index = () => {
@@ -50,124 +52,13 @@ const Index = () => {
   } = useCarsSupabase();
 
   const notifications = useNotifications(cars);
-  const [broadcasts, setBroadcasts] = useState<Notification[]>([]);
+  const broadcasts = useInbox();
   const [selectedCar, setSelectedCar] = useState<CarType | null>(null);
   const [showMileagePrompt, setShowMileagePrompt] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [carToDelete, setCarToDelete] = useState<CarType | null>(null);
 
-  useEffect(() => {
-    const syncBroadcasts = () => {
-      const stored = getBroadcastNotifications();
-      const mapped: Notification[] = stored.map(b => ({
-        id: b.id,
-        carId: 'system',
-        carName: `📢 ${b.title}`,
-        type: 'legal',
-        message: b.body,
-        severity: b.severity,
-        date: b.createdAt
-      }));
-      setBroadcasts(mapped);
-    };
-
-    syncBroadcasts();
-    window.addEventListener('garage_new_broadcast', syncBroadcasts);
-
-    return () => {
-      window.removeEventListener('garage_new_broadcast', syncBroadcasts);
-    };
-  }, []);
-
   const allNotifications = [...broadcasts, ...notifications];
-
-  // Schedule background notifications natively in the OS
-  useEffect(() => {
-    if (isLoaded && cars.length > 0) {
-      NotificationService.scheduleBackgroundNotifications(cars);
-    }
-  }, [cars, isLoaded]);
-
-  // Play sound + send immediate browser notifications on first load with active alerts
-  useEffect(() => {
-    if (!isLoaded || notifications.length === 0) return;
-
-    // --- Sound: once per session ---
-    const soundPlayed = sessionStorage.getItem('garage-alert-sound-played');
-    if (!soundPlayed) {
-      sessionStorage.setItem('garage-alert-sound-played', 'true');
-
-      const playSound = () => {
-        try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const oscillator = ctx.createOscillator();
-          const gain = ctx.createGain();
-          oscillator.connect(gain);
-          gain.connect(ctx.destination);
-          oscillator.type = 'sine';
-          oscillator.frequency.setValueAtTime(660, ctx.currentTime);
-          oscillator.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
-          gain.gain.setValueAtTime(0.4, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-          oscillator.start(ctx.currentTime);
-          oscillator.stop(ctx.currentTime + 0.6);
-        } catch (_) { /* ignore */ }
-      };
-
-      try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        if (ctx.state === 'running') {
-          playSound();
-        } else {
-          const unlockAndPlay = () => { playSound(); };
-          document.addEventListener('click', unlockAndPlay, { once: true });
-          document.addEventListener('touchstart', unlockAndPlay, { once: true });
-        }
-      } catch (_) { /* ignore */ }
-    }
-
-    // --- Browser notifications: only for unseen alerts ---
-    if (typeof window === 'undefined' || !('Notification' in window) || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-
-    try {
-      const shownKey = 'garage-shown-alerts';
-      const shown: string[] = JSON.parse(localStorage.getItem(shownKey) || '[]');
-      const newAlerts = notifications.filter(n => !shown.includes(n.id));
-      if (newAlerts.length === 0) return;
-
-      const topAlert = newAlerts[0];
-      const body = newAlerts.length > 1
-        ? `${topAlert.message} (+${newAlerts.length - 1} تنبيهات أخرى)`
-        : topAlert.message;
-
-      // Try Service Worker showNotification first (works on Android + desktop)
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration('/').then(reg => {
-          if (reg) {
-            reg.showNotification(topAlert.carName, {
-              body,
-              icon: '/favicon.ico',
-              tag: 'garage-active-alerts',
-            }).catch(() => {
-              // SW failed — fallback to direct (desktop only)
-              try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) { }
-            });
-          } else {
-            // No SW registered — try direct (desktop only, Android may throw)
-            try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) { }
-          }
-        }).catch(() => { });
-      } else {
-        // No service worker support — desktop fallback
-        try { new Notification(topAlert.carName, { body, icon: '/favicon.ico', tag: 'garage-active-alerts' }); } catch (_) { }
-      }
-
-      localStorage.setItem(shownKey, JSON.stringify([
-        ...shown,
-        ...newAlerts.map(n => n.id),
-      ]));
-    } catch (_) { /* ignore any unexpected errors */ }
-  }, [isLoaded, notifications.length]);
 
   useEffect(() => {
     if (isLoaded && cars.length > 0 && shouldShowMileagePrompt()) {
@@ -312,6 +203,7 @@ const Index = () => {
             onAdd={(service) => addBrakeTireService(car.id, service)}
             onUpdateSettings={(settings) => updateCarSettings(car.id, settings)}
           />
+          <CustomReminders carId={car.id} />
           {/* Delete Confirmation Dialog */}
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <AlertDialogContent className="fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 font-tajawal text-right">
@@ -477,3 +369,4 @@ const Index = () => {
 };
 
 export default Index;
+

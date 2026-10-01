@@ -4,6 +4,7 @@ const config: CapacitorConfig = {
   appId: 'com.obada.garage.app',
   appName: 'Garage',
   webDir: 'dist',
+  plugins: { PushNotifications: { presentationOptions: ['badge', 'sound', 'banner', 'list'] } },
   server: {
     androidScheme: 'https'
   },

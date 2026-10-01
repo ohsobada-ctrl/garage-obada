@@ -1,146 +1,50 @@
-import { useEffect, useState } from "react";
-import { AuthContext, CustomUser } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
+import { AuthContext, CustomUser } from '@/lib/auth';
+import { supabase } from '@/integrations/supabase/client';
+import { NotificationService } from '@/services/notificationService';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<CustomUser | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const checkAdminStatus = (userEmail?: string): boolean => {
-    const adminEmail = "ohsobada@gmail.com";
-    if (userEmail && userEmail.toLowerCase().trim() === adminEmail) {
-      return true;
-    }
-    const savedEmail = localStorage.getItem("garage_user_email");
-    if (savedEmail && savedEmail.toLowerCase().trim() === adminEmail) {
-      return true;
-    }
-    const stored = localStorage.getItem("garage_is_admin");
-    return stored === "true";
-  };
-
-  const toggleAdmin = (status?: boolean) => {
-    setUser((prev) => {
-      if (!prev) return null;
-      const nextAdminState = status !== undefined ? status : !prev.isAdmin;
-      localStorage.setItem("garage_is_admin", nextAdminState ? "true" : "false");
-      return {
-        ...prev,
-        isAdmin: nextAdminState,
-        role: nextAdminState ? "admin" : "user",
-      };
-    });
-  };
-
+  const queryClient = useQueryClient();
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let alive = true;
+    let revision = 0;
+    const restore = (sessionUser: User | null) => {
+      const current = ++revision;
+      if (!alive) return;
+      if (!sessionUser) {
+        setUser(null);
+        queryClient.clear();
+        setLoading(false);
+        return;
+      }
+      setUser({ uid: sessionUser.id, email: sessionUser.email, phone: sessionUser.phone, isAdmin: false });
       setLoading(false);
-    }, 1000);
-
-    const restoreUserSession = (sessionUser?: any) => {
-      try {
-        if (sessionUser) {
-          const userEmail = sessionUser.email || localStorage.getItem("garage_user_email") || undefined;
-          if (userEmail) localStorage.setItem("garage_user_email", userEmail);
-          localStorage.setItem("garage_user_id", sessionUser.id);
-
-          const isAdmin = checkAdminStatus(userEmail);
-          setUser({
-            uid: sessionUser.id,
-            phoneNumber: sessionUser.phone || sessionUser.user_metadata?.phone || localStorage.getItem("garage_user_phone") || undefined,
-            phone: sessionUser.phone || sessionUser.user_metadata?.phone || localStorage.getItem("garage_user_phone") || undefined,
-            email: userEmail,
-            role: isAdmin ? "admin" : "user",
-            isAdmin: isAdmin,
-          });
-          setLoading(false);
-          return true;
-        }
-
-        // Check local storage fallback for offline / persistent login
-        const savedId = localStorage.getItem("garage_user_id");
-        const savedEmail = localStorage.getItem("garage_user_email") || undefined;
-        const savedPhone = localStorage.getItem("garage_user_phone") || undefined;
-
-        if (savedId) {
-          const isAdmin = checkAdminStatus(savedEmail);
-          setUser({
-            uid: savedId,
-            phoneNumber: savedPhone,
-            phone: savedPhone,
-            email: savedEmail,
-            role: isAdmin ? "admin" : "user",
-            isAdmin: isAdmin,
-          });
-          setLoading(false);
-          return true;
-        }
-
-        setUser(null);
-        setLoading(false);
-        return false;
-      } catch (err) {
-        console.error("Auth session error:", err);
-        setLoading(false);
-        return false;
-      }
+      // Do not await Supabase calls inside its auth callback.
+      setTimeout(() => {
+        void supabase.rpc('is_garage_admin').then(({ data, error }) => {
+          if (alive && revision === current) setUser(prev => prev && ({ ...prev, isAdmin: !error && data === true }));
+        });
+      }, 0);
     };
-
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      restoreUserSession(session?.user);
-    }).catch(() => {
-      restoreUserSession();
-    });
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        // Only wipe localStorage if user explicitly signs out
-        // Check if this is a real sign-out vs initial load with no session
-        const hadSession = !!localStorage.getItem("garage_user_id");
-        if (hadSession) {
-          localStorage.removeItem("garage_user_id");
-          localStorage.removeItem("garage_user_email");
-          localStorage.removeItem("garage_user_phone");
-          localStorage.removeItem("garage_is_admin");
-        }
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      if (event === 'INITIAL_SESSION' && !session) {
-        // No Supabase session on startup — try localStorage fallback
-        restoreUserSession();
-        return;
-      }
-
-      if (session?.user) {
-        restoreUserSession(session.user);
-      }
-    });
-
-    return () => {
-      clearTimeout(timer);
-      subscription.unsubscribe();
-    };
-  }, []);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => restore(session?.user ?? null));
+    const initialRevision = revision;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (revision === initialRevision) restore(data.session?.user ?? null);
+    }).catch(() => { if (alive) setLoading(false); });
+    return () => { alive = false; subscription.unsubscribe(); };
+  }, [queryClient]);
 
   const signOut = async () => {
-    localStorage.removeItem("garage_user_phone");
-    localStorage.removeItem("garage_user_id");
-    localStorage.removeItem("garage_user_email");
-    localStorage.removeItem("garage_is_admin");
+    await NotificationService.disable();
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) throw error;
+    for (const key of ['garage_user_id', 'garage_user_email', 'garage_user_phone', 'garage_is_admin', 'garage_broadcast_notifications_store']) localStorage.removeItem(key);
+    queryClient.clear();
     setUser(null);
-    try {
-      await supabase.auth.signOut();
-    } catch (_) {}
   };
-
-  return (
-    <AuthContext.Provider value={{ user, loading, signOut, toggleAdmin }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, loading, signOut }}>{children}</AuthContext.Provider>;
 }

@@ -13,7 +13,6 @@ export type AuthState = {
   user: CustomUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  toggleAdmin?: (status?: boolean) => void;
 };
 
 export const AuthContext = createContext<AuthState>({

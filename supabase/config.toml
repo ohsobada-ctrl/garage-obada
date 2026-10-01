@@ -2,3 +2,6 @@ project_id = "nfdfppkpdzrfobssrlui"
 
 [functions.telegram-bot]
 verify_jwt = false
+
+[functions.dispatch-notifications]
+verify_jwt = false # Worker validates a separate x-cron-secret; never expose it in VITE_ variables.

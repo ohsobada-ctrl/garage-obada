@@ -74,7 +74,7 @@ export default function Auth() {
     setLoading(true);
     try {
       const cleanEmail = email.toLowerCase().trim();
-      const isAdminEmail = cleanEmail === "ohsobada@gmail.com";
+      localStorage.setItem("remember_me", rememberMe ? "true" : "false");
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
@@ -97,17 +97,10 @@ export default function Auth() {
         throw error;
       }
       
-      if (data?.user) {
-        localStorage.setItem("garage_user_email", cleanEmail);
-        localStorage.setItem("garage_user_id", data.user.id);
-        if (isAdminEmail) {
-          localStorage.setItem("garage_is_admin", "true");
-        }
-      }
       
       // حفظ خيار تذكرني
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
-      toast.success(isAdminEmail ? "تم تسجيل دخول الأدمن بنجاح 👑" : "تم تسجيل الدخول بنجاح");
+      toast.success("تم تسجيل الدخول بنجاح");
       navigate("/");
     } catch (error: any) {
       toast.error(error.message);
@@ -142,6 +135,7 @@ export default function Auth() {
 
     setLoading(true);
     try {
+      localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase(),
         password,
@@ -208,6 +202,7 @@ export default function Auth() {
 
     setLoading(true);
     try {
+      localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       const { data, error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase(),
         token: otpToken,
@@ -235,6 +230,7 @@ export default function Auth() {
 
     setLoading(true);
     try {
+      localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       const { data, error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase(),
         token: otpToken,
@@ -508,3 +504,4 @@ export default function Auth() {
     </div>
   );
 }
+

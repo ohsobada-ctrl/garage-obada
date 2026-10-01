@@ -1,15 +1,9 @@
-import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { NotificationService } from "@/services/notificationService";
 import { AuthProvider } from "@/components/AuthProvider";
-import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
-import { saveBroadcastNotification } from "@/components/AdminDashboard";
-import { LocalNotifications } from "@capacitor/local-notifications";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -31,83 +25,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
-  useEffect(() => {
-    // Only initialize push permissions silently on Native Android, avoid Web/iOS Safari prompt blocking
-    try {
-      if (Capacitor.isNativePlatform()) {
-        NotificationService.createChannel().catch(() => {});
-        NotificationService.requestPermissions().catch(() => {});
-        NotificationService.initPushNotifications().catch(() => {});
-      }
-    } catch (_) {
-      // Silently ignore
-    }
 
-    // Top-level global broadcast listener for ALL devices/users (guest or logged-in)
-    const processedIds = new Set<string>();
-
-    const channel = supabase
-      .channel('garage_global_broadcasts')
-      .on('broadcast', { event: 'new_admin_notification' }, (payload) => {
-        if (payload.payload) {
-          const item = payload.payload;
-
-          // Prevent duplicate execution/scheduling of the same notification
-          if (processedIds.has(item.id)) return;
-          processedIds.add(item.id);
-
-          saveBroadcastNotification(item);
-
-          // Send delivery ACK back to channel for admin metrics tracking
-          try {
-            const savedEmail = localStorage.getItem("garage_user_email") || "زائر";
-            channel.send({
-              type: 'broadcast',
-              event: 'ack_admin_notification',
-              payload: {
-                notificationId: item.id,
-                userEmail: savedEmail,
-                timestamp: new Date().toISOString()
-              }
-            }).catch(() => {});
-          } catch (_) {}
-
-          // Trigger native notification with sound or browser alert
-          if (Capacitor.isNativePlatform()) {
-            let numericId = 1000;
-            for (let i = 0; i < item.id.length; i++) {
-              numericId = (numericId + item.id.charCodeAt(i)) % 2147483647;
-            }
-
-            LocalNotifications.schedule({
-              notifications: [{
-                id: numericId,
-                title: `📢 ${item.title}`,
-                body: item.body,
-                schedule: { at: new Date(Date.now() + 100) },
-                sound: 'default',
-                channelId: 'default-channel-v3',
-                ongoing: false,
-                autoCancel: true,
-              }]
-            }).catch(() => {});
-          } else if (typeof window !== 'undefined' && 'Notification' in window && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            try {
-              new Notification(`📢 ${item.title}`, {
-                body: item.body,
-                icon: '/favicon.ico',
-                tag: item.id
-              });
-            } catch (_) {}
-          }
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

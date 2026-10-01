@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sessionStorageAdapter } from '@/lib/sessionStorage';
 
 // Support both VITE_ and LOVABLE_ prefixes for maximum compatibility
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.LOVABLE_SUPABASE_URL || 'https://ufaqfqcbovgkpqlujnxo.supabase.co';
@@ -6,6 +7,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.en
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    storage: sessionStorageAdapter,
     persistSession: true,
     autoRefreshToken: true,
   },

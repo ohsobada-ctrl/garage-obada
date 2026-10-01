@@ -1,0 +1,6 @@
+{
+  "id": "/", "name": "كراج - Garage", "short_name": "كراج",
+  "start_url": "/", "scope": "/", "display": "standalone",
+  "lang": "ar", "dir": "rtl", "background_color": "#111111", "theme_color": "#f59e0b",
+  "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

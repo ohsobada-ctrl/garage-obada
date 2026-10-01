@@ -22,8 +22,7 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
     e.preventDefault();
     if (!make.trim() || !model.trim()) return;
     
-    // Request permission on user gesture
-    await NotificationService.requestPermissions();
+
     
     onAdd({
       make: make.trim(),
@@ -32,8 +31,7 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
       currentMileage: Number(mileage),
     });
 
-    // Schedule notifications for the new car
-    await NotificationService.scheduleMaintenanceAlerts(`${make} ${model}`);
+
     
     setMake('');
     setModel('');
@@ -119,3 +117,4 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
     </Dialog>
   );
 }
+
