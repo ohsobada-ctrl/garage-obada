@@ -14,6 +14,7 @@ import { OilService } from '@/components/OilService';
 import { BrakesTires } from '@/components/BrakesTires';
 import { CustomReminders } from '@/components/CustomReminders';
 import { useInbox } from '@/hooks/useInbox';
+import { InboxStatus } from '@/components/InboxStatus';
 import { MileagePrompt } from '@/components/MileagePrompt';
 import { MileageEditor } from '@/components/MileageEditor';
 import { useCarsSupabase } from '@/hooks/useCarsSupabase';
@@ -52,7 +53,8 @@ const Index = () => {
   } = useCarsSupabase();
 
   const notifications = useNotifications(cars);
-  const broadcasts = useInbox();
+  const inbox = useInbox();
+  const broadcasts = inbox.notifications;
   const [selectedCar, setSelectedCar] = useState<CarType | null>(null);
   const [showMileagePrompt, setShowMileagePrompt] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -145,6 +147,7 @@ const Index = () => {
         </header>
 
         <main className="container pt-6 space-y-6">
+          <InboxStatus error={inbox.error} busy={inbox.isFetching} retry={() => void inbox.refetch()} />
           {/* Car Info Card */}
           <Card className="overflow-hidden">
             <div className="gradient-gold h-2" />
@@ -269,6 +272,7 @@ const Index = () => {
       </header>
 
       <main className="container pt-6 pb-24">
+        <InboxStatus error={inbox.error} busy={inbox.isFetching} retry={() => void inbox.refetch()} />
         {cars.length > 0 && (
           <>
             <StatsGrid cars={cars} notifications={notifications} />

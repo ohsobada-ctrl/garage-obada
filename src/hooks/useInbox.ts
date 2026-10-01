@@ -5,19 +5,21 @@ import { useAuth } from '@/lib/auth';
 import type { Notification } from '@/types/car';
 import { NotificationService } from '@/services/notificationService';
 import { toast } from 'sonner';
+import { isBackendSetupError, shouldRetryBackend } from '@/lib/backendError';
 
-export function useInbox(): Notification[] {
+export function useInbox() {
   const { user } = useAuth();
   const client = useQueryClient();
-  const { data = [], error } = useQuery({
+  const { data = [], error, refetch, isFetching } = useQuery({
     queryKey: ['inbox', user?.uid], enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase.from('notification_inbox').select('*').order('created_at', { ascending: false }).limit(200);
       if (error) throw error;
       return data;
-    }, refetchInterval: 30000,
+    },
+    retry: shouldRetryBackend,
+    refetchInterval: query => isBackendSetupError(query.state.error) ? false : 30000,
   });
-  useEffect(() => { if (error) toast.error('تعذر تحديث صندوق الإشعارات، سنعيد المحاولة تلقائياً'); }, [error]);
   useEffect(() => {
     if (!user) return;
     const channel = supabase.channel(`inbox:${user.uid}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notification_inbox', filter: `user_id=eq.${user.uid}` }, () => {
@@ -28,5 +30,6 @@ export function useInbox(): Notification[] {
     }
     return () => { void supabase.removeChannel(channel); };
   }, [user?.uid, client]);
-  return data.map(row => ({ id: row.id, carId: 'system', carName: row.title, message: row.body, type: 'legal', severity: row.severity, date: row.created_at }));
+  const notifications: Notification[] = data.map(row => ({ id: row.id, carId: 'system', carName: row.title, message: row.body, type: 'legal', severity: row.severity, date: row.created_at }));
+  return { notifications, error, refetch, isFetching };
 }
