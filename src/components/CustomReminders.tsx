@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { isBackendSetupError, shouldRetryBackend } from '@/lib/backendError';
 
 type Reminder = { id: string; name: string; part_year: number; notes: string; remind_at: string; repeat_days: number; enabled: boolean };
 const blank = () => ({ name: '', part_year: new Date().getFullYear(), notes: '', remind_at: '', repeat_days: 0 });
@@ -29,7 +30,7 @@ export function CustomReminders({ carId }: { carId: string }) {
     const { data, error } = await supabase.from('maintenance_reminders').select('*').eq('car_id', carId).order('remind_at');
     if (error) throw error;
     return data as Reminder[];
-  }, refetchInterval: 60000 });
+  }, retry: shouldRetryBackend, refetchInterval: query => isBackendSetupError(query.state.error) ? false : 60000 });
   const save = useMutation({ mutationFn: async () => {
     if (!form.name.trim() || !Number.isFinite(new Date(form.remind_at).getTime()) || new Date(form.remind_at).getTime() <= Date.now()) throw new Error('اختار اسم وموعد تنبيه في المستقبل');
     const values = { ...form, name: form.name.trim(), remind_at: new Date(form.remind_at).toISOString(), enabled: true, car_id: carId };
@@ -45,7 +46,7 @@ export function CustomReminders({ carId }: { carId: string }) {
     <CardContent className="space-y-4">
       <p className="text-sm text-muted-foreground">ذكّرني بتغيير البطارية أو أي قطعة أخرى، في الوقت اللي نختاره.</p>
       {query.isLoading && <p role="status">جاري تحميل التذكيرات...</p>}
-      {query.isError && <p role="alert" className="text-destructive">تعذر تحميل التذكيرات. تأكد من الاتصال وتحديث قاعدة البيانات. <Button variant="ghost" onClick={() => query.refetch()}>إعادة المحاولة</Button></p>}
+      {query.isError && <p role="alert" className="text-muted-foreground">تعذر تحميل التذكيرات حالياً. <Button variant="ghost" disabled={query.isFetching} onClick={() => query.refetch()}>إعادة المحاولة</Button></p>}
       {query.data?.map(item => <div key={item.id} className="rounded-xl border p-4 space-y-2">
         <div className="flex justify-between gap-2"><strong>{item.name} · {item.part_year}</strong><span className="text-xs">{item.enabled ? 'مفعّل' : 'تم التنبيه'}</span></div>
         <p className="text-sm">{new Date(item.remind_at).toLocaleString('ar-LY')} {item.repeat_days > 0 && `· كل ${item.repeat_days} يوم`}</p>
@@ -53,7 +54,7 @@ export function CustomReminders({ carId }: { carId: string }) {
         <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => { setEditing(item.id); setForm({ ...item, remind_at: localDateTime(item.remind_at) }); setOpen(true); }}><Pencil className="w-4 h-4 ml-1" />تعديل</Button>
           <Button variant="ghost" size="sm" disabled={remove.isPending} onClick={() => { if (window.confirm(`حذف تذكير ${item.name}؟`)) remove.mutate(item.id); }}><Trash2 className="w-4 h-4 ml-1" />حذف</Button></div>
       </div>)}
-      <Button variant="gold" className="w-full" onClick={() => { setEditing(null); setForm(blank()); setOpen(true); }}>إضافة قطعة / تذكير</Button>
+      <Button variant="gold" className="w-full" disabled={query.isError || query.isLoading} onClick={() => { setEditing(null); setForm(blank()); setOpen(true); }}>إضافة قطعة / تذكير</Button>
       <Dialog open={open} onOpenChange={setOpen}><DialogContent dir="rtl"><DialogHeader><DialogTitle>{editing ? 'تعديل التذكير' : 'إضافة تذكير تغيير قطعة'}</DialogTitle></DialogHeader>
         <form className="space-y-4" onSubmit={e => { e.preventDefault(); save.mutate(); }}>
           <div><Label htmlFor="part-name">اسم القطعة</Label><Input id="part-name" placeholder="مثلاً: البطارية" required maxLength={100} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>

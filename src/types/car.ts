@@ -56,6 +56,7 @@ export interface Notification {
   message: string;
   severity: 'info' | 'warning' | 'danger';
   date: string;
+  readAt?: string | null;
 }
 
 export const defaultCarSettings: CarSettings = {

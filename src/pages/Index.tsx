@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { Car, Bell, Plus, ArrowRight, Gauge, Trash2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NotificationService } from "@/services/notificationService";
@@ -58,6 +61,27 @@ const Index = () => {
 
   const notifications = useNotifications(cars);
   const inbox = useInbox();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
+  const notificationId = searchParams.get('notification');
+  useEffect(() => {
+    if (notificationId) { setSelectedNotificationId(notificationId); setNotificationsOpen(true); }
+  }, [notificationId]);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listener = PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
+      if (typeof notification.data?.id === 'string') { setSelectedNotificationId(notification.data.id); setNotificationsOpen(true); }
+    });
+    return () => { void listener.then(handle => handle.remove()); };
+  }, []);
+  const changeNotificationsOpen = (open: boolean) => {
+    setNotificationsOpen(open);
+    if (!open) {
+      setSelectedNotificationId(null);
+      if (notificationId) setSearchParams(prev => { prev.delete('notification'); return prev; }, { replace: true });
+    }
+  };
   const broadcasts = inbox.notifications;
   const [selectedCar, setSelectedCar] = useState<CarType | null>(null);
   const [showMileagePrompt, setShowMileagePrompt] = useState(false);
@@ -65,6 +89,7 @@ const Index = () => {
   const [carToDelete, setCarToDelete] = useState<CarType | null>(null);
 
   const allNotifications = [...broadcasts, ...notifications];
+  const unreadCount = broadcasts.filter(item => !item.readAt).length + notifications.length;
 
   useEffect(() => {
     if (isLoaded && cars.length > 0 && shouldShowMileagePrompt()) {
@@ -133,13 +158,13 @@ const Index = () => {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4">
-                <Sheet>
+                <Sheet open={notificationsOpen} onOpenChange={changeNotificationsOpen}>
                   <SheetTrigger asChild>
                     <Button variant="outline" size="icon" className="relative rounded-full bg-background/50 hover:bg-secondary/50 border-border/50">
                       <Bell className="w-5 h-5" />
-                      {carNotifications.length > 0 && (
+                      {unreadCount > 0 && (
                         <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold shadow-sm">
-                          {carNotifications.length}
+                          {unreadCount > 99 ? '99+' : unreadCount}
                         </span>
                       )}
                     </Button>
@@ -149,7 +174,7 @@ const Index = () => {
                       <SheetTitle>التنبيهات</SheetTitle>
                     </SheetHeader>
                     <div className="mt-4">
-                      <NotificationCenter notifications={carNotifications} showHeader={false} />
+                      <NotificationCenter notifications={allNotifications} showHeader={false} onRead={inbox.markRead} selectedId={selectedNotificationId} />
                     </div>
                   </SheetContent>
                 </Sheet>
@@ -258,13 +283,13 @@ const Index = () => {
               <h1 className="text-xl font-bold tracking-tight">المرآب</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <Sheet>
+              <Sheet open={notificationsOpen} onOpenChange={changeNotificationsOpen}>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="icon" className="relative rounded-full bg-background/50 hover:bg-secondary/50 border-border/50">
                     <Bell className="w-5 h-5" />
-                    {allNotifications.length > 0 && (
+                    {unreadCount > 0 && (
                       <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold shadow-sm">
-                        {allNotifications.length}
+                        {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     )}
                   </Button>
@@ -274,7 +299,7 @@ const Index = () => {
                     <SheetTitle>مركز التنبيهات</SheetTitle>
                   </SheetHeader>
                   <div className="mt-4">
-                    <NotificationCenter notifications={allNotifications} showHeader={false} />
+                    <NotificationCenter notifications={allNotifications} showHeader={false} onRead={inbox.markRead} selectedId={selectedNotificationId} />
                   </div>
                 </SheetContent>
               </Sheet>

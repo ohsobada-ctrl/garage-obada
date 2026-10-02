@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import webpush from 'npm:web-push@3.6.7';
 import { importPKCS8, SignJWT } from 'npm:jose@5.9.6';
+import { pushPreview } from './payload.ts';
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 function required(name: string) {
@@ -88,7 +89,8 @@ Deno.serve(async request => {
   if (request.method !== 'POST' || !Deno.env.get('NOTIFICATION_CRON_SECRET') || request.headers.get('x-cron-secret') !== Deno.env.get('NOTIFICATION_CRON_SECRET')) return new Response('Unauthorized', { status: 401 });
   try {
     const { error: reminderError } = await db.rpc('enqueue_due_reminders');
-    if (reminderError) throw reminderError;
+    // A malformed legacy maintenance record must not block queued admin messages.
+    if (reminderError) console.error('Reminder enqueue failed', reminderError.code);
     await db.from('push_deliveries').update({ status: 'failed', last_error: 'Retry limit reached' }).in('status', ['pending','processing']).gte('attempts', 8).lte('next_attempt_at', new Date().toISOString());
     const { data: jobs, error } = await db.rpc('claim_push_deliveries');
     if (error) throw error;
@@ -104,7 +106,7 @@ Deno.serve(async request => {
           if (!device || !message || !device.enabled || device.user_id !== message.user_id) {
             await db.from('push_deliveries').update({ status: 'skipped' }).eq('id', job.id); return;
           }
-          await send(device, { id: message.id, title: message.title, body: message.body });
+          await send(device, pushPreview({ id: message.id, title: message.title, body: message.body }));
           const { error } = await db.from('push_deliveries').update({ status: 'accepted', accepted_at: new Date().toISOString(), last_error: null }).eq('id', job.id);
           if (error) throw error;
         } catch (error) {
@@ -117,7 +119,7 @@ Deno.serve(async request => {
         }
       }));
     }
-    return Response.json({ processed: jobs.length });
+    return Response.json({ processed: jobs.length, remindersQueued: !reminderError });
   } catch (error) {
     console.error('Notification dispatch failed', error instanceof Error ? error.message : 'Database error');
     return new Response('Dispatch failed', { status: 500 });

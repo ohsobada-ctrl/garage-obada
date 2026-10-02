@@ -33,6 +33,8 @@ export default function Auth() {
   const [rememberMe, setRememberMe] = useState(true);
   const [otpToken, setOtpToken] = useState("");
   const navigate = useNavigate();
+  const notificationId = new URLSearchParams(window.location.search).get("notification");
+  const nextPath = notificationId ? `/?notification=${encodeURIComponent(notificationId)}` : "/";
 
   useEffect(() => {
     // Listen for auth state changes to detect password recovery redirection
@@ -101,7 +103,7 @@ export default function Auth() {
       // حفظ خيار تذكرني
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       toast.success("تم تسجيل الدخول بنجاح");
-      navigate("/");
+      navigate(nextPath, { replace: true });
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -157,7 +159,7 @@ export default function Auth() {
       if (data?.session) {
         localStorage.setItem("remember_me", rememberMe ? "true" : "false");
         toast.success("تم إنشاء الحساب وتسجيل الدخول بنجاح!");
-        navigate("/");
+        navigate(nextPath, { replace: true });
       } else {
         toast.success("تم إنشاء الحساب بنجاح! يرجى إدخال رمز التحقق المكون من 6 أرقام المرسل إلى بريدك الإلكتروني.");
         setOtpToken("");
@@ -213,7 +215,7 @@ export default function Auth() {
 
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       toast.success("تم تأكيد الحساب وتسجيل الدخول بنجاح!");
-      navigate("/");
+      navigate(nextPath, { replace: true });
     } catch (error: any) {
       toast.error(error.message || "رمز التحقق غير صحيح");
     } finally {
@@ -270,7 +272,7 @@ export default function Auth() {
       });
       if (error) throw error;
       toast.success("تم تحديث كلمة المرور بنجاح! تم تسجيل دخولك.");
-      navigate("/");
+      navigate(nextPath, { replace: true });
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -504,4 +506,5 @@ export default function Auth() {
     </div>
   );
 }
+
 

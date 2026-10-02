@@ -5,14 +5,16 @@ self.addEventListener('push', event => {
   let data = {};
   try { data = event.data?.json() || {}; } catch { data = { body: event.data?.text() }; }
   event.waitUntil(self.registration.showNotification(data.title || 'كراج', {
-    body: data.body || '', icon: '/favicon.ico', tag: data.id || 'garage', data: { url: '/' },
+    body: data.body || '', icon: '/favicon.ico', tag: data.id || 'garage', data: { url: data.id ? '/?notification=' + encodeURIComponent(data.id) : '/' },
   }));
 });
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const target = new URL(event.notification.data?.url || '/', self.location.origin);
+  const url = target.origin === self.location.origin ? target.href : self.location.origin + '/';
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async list => {
     const client = list.find(item => new URL(item.url).origin === self.location.origin);
-    if (client) { await client.navigate('/'); return client.focus(); }
-    return self.clients.openWindow('/');
+    if (client) { await client.navigate(url); return client.focus(); }
+    return self.clients.openWindow(url);
   }));
 });

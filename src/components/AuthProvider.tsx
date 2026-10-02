@@ -21,12 +21,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         return;
       }
-      setUser({ uid: sessionUser.id, email: sessionUser.email, phone: sessionUser.phone, isAdmin: false });
+      setUser(prev => ({ uid: sessionUser.id, email: sessionUser.email, phone: sessionUser.phone,
+        isAdmin: prev?.uid === sessionUser.id ? prev.isAdmin : false }));
       setLoading(false);
       // Do not await Supabase calls inside its auth callback.
       setTimeout(() => {
+        if (!alive || revision !== current) return;
         void supabase.rpc('is_garage_admin').then(({ data, error }) => {
-          if (alive && revision === current) setUser(prev => prev && ({ ...prev, isAdmin: !error && data === true }));
+          if (alive && revision === current && !error) setUser(prev => prev && ({ ...prev, isAdmin: data === true }));
         });
       }, 0);
     };

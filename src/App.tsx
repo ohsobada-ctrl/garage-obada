@@ -19,7 +19,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     </div>
   );
   
-  if (!user) return <Navigate to="/auth" replace />;
+  if (!user) {
+    const notificationId = new URLSearchParams(window.location.search).get('notification');
+    return <Navigate to={notificationId ? `/auth?notification=${encodeURIComponent(notificationId)}` : '/auth'} replace />;
+  }
   
   return <>{children}</>;
 };

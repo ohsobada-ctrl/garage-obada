@@ -40,6 +40,8 @@ test('notification migration: RLS, broadcast fanout, idempotency, reminders and 
     await assert.rejects(db.query('select garage_admin_report()'), /Admin access required/);
     await assert.rejects(db.query(`select send_garage_broadcast('${broadcast}','Spoof','Body','info')`), /Admin access required/);
     assert.equal((await db.query('select * from notification_inbox')).rows.length, 1);
+    await db.exec(`update notification_inbox set read_at=now() where read_at is null;`);
+    assert.equal((await db.query('select count(*)::int as n from notification_inbox where read_at is not null')).rows[0].n, 1);
     await assert.rejects(db.exec(`update notification_inbox set body='spoof'`), /permission denied/);
     await db.exec('reset role');
     const car = '66666666-6666-4666-8666-666666666666';

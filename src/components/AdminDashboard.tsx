@@ -66,8 +66,9 @@ export function AdminDashboard({ children }: { carsCount?: number; children?: Re
       <p className="text-xs text-muted-foreground">كل حساب يستلم نسخة في مركز التنبيهات. «قبله مزوّد Push» هو عدد الأجهزة المقبولة للإرسال، ولا يثبت عرض الإشعار على الجهاز. صلاحيات الأدمن تُدار بأمان في الخادم.</p>
       <div className="space-y-3">{report?.broadcasts.map(item => <div key={item.id} className="rounded-xl border p-3 space-y-2">
         <strong>{item.title}</strong><p className="text-sm whitespace-pre-wrap">{item.body}</p><p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString('ar-LY')}</p>
-        <div className="flex flex-wrap gap-3 text-xs"><span>حسابات مستهدفة: {item.recipients}</span><span>فُتح داخل التطبيق: {item.opened}</span><span>قبله مزوّد Push: {item.accepted}</span><span>أجهزة قيد الإرسال: {item.pending}</span><span>فشل: {item.failed}</span></div>
+        <div className="flex flex-wrap gap-3 text-xs"><span>حسابات مستهدفة: {item.recipients}</span><span>قُرئ داخل التطبيق: {item.opened}</span><span>قبله مزوّد Push: {item.accepted}</span><span>أجهزة قيد الإرسال: {item.pending}</span><span>فشل: {item.failed}</span></div>
       </div>)}</div>
     </DialogContent>
   </Dialog>;
 }
+
