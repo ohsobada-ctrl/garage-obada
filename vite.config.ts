@@ -15,5 +15,5 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  envPrefix: ["VITE_", "FIREBASE_"],
+  envPrefix: ["VITE_", "LOVABLE_SUPABASE_URL", "LOVABLE_SUPABASE_ANON_KEY", "LOVABLE_SUPABASE_PUBLISHABLE_KEY"],
 }));

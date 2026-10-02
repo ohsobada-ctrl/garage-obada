@@ -3,13 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Car, defaultCarSettings } from "@/types/car";
 import { toast } from "sonner";
+import { backendError, shouldRetryBackend } from '@/lib/backendError';
 
 export function useCarsSupabase() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // 1. Fetch Cars
-  const { data: cars = [], isLoading } = useQuery({
+  const { data: cars = [], isLoading, error: loadError, refetch, isFetching } = useQuery({
     queryKey: ["cars", user?.uid],
     queryFn: async () => {
       if (!user) return [];
@@ -37,6 +38,7 @@ export function useCarsSupabase() {
       })) as Car[];
     },
     enabled: !!user,
+    retry: shouldRetryBackend,
   });
 
   // 2. Add Car
@@ -103,6 +105,7 @@ export function useCarsSupabase() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cars"] });
     },
+    onError: error => toast.error(backendError(error, 'تعذر حفظ التغيير')),
   });
 
   // 4. Delete Car
@@ -118,6 +121,7 @@ export function useCarsSupabase() {
       queryClient.invalidateQueries({ queryKey: ["cars"] });
       toast.success("تم حذف السيارة");
     },
+    onError: error => toast.error(backendError(error, 'تعذر حذف السيارة')),
   });
 
   // Helper Wrappers
@@ -181,6 +185,9 @@ export function useCarsSupabase() {
     cars,
     isLoading,
     isLoaded: !isLoading,
+    loadError,
+    refetch,
+    isFetching,
     addCar: addCarMutation.mutate,
     updateCar: updateCarMutation.mutate,
     deleteCar: deleteCarMutation.mutate,

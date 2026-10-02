@@ -15,6 +15,7 @@ import { BrakesTires } from '@/components/BrakesTires';
 import { CustomReminders } from '@/components/CustomReminders';
 import { useInbox } from '@/hooks/useInbox';
 import { InboxStatus } from '@/components/InboxStatus';
+import { backendError } from '@/lib/backendError';
 import { MileagePrompt } from '@/components/MileagePrompt';
 import { MileageEditor } from '@/components/MileageEditor';
 import { useCarsSupabase } from '@/hooks/useCarsSupabase';
@@ -43,6 +44,9 @@ const Index = () => {
   const {
     cars,
     isLoaded,
+    loadError,
+    refetch,
+    isFetching,
     addCar,
     deleteCar,
     addLegalDoc,
@@ -95,6 +99,14 @@ const Index = () => {
       </div>
     );
   }
+
+  if (loadError && cars.length === 0) return <main dir="rtl" className="container py-12 space-y-4 text-center">
+    <SideDrawer carsCount={0} />
+    <h1 className="text-xl font-bold">تعذر تحميل سياراتك</h1>
+    <p role="alert">{backendError(loadError, 'فشل جلب البيانات')}</p>
+    <p className="text-sm text-muted-foreground">هذا لا يعني أن سياراتك انحذفت. أعد المحاولة بعد استعادة الاتصال.</p>
+    <Button disabled={isFetching} onClick={() => void refetch()}>{isFetching ? 'جاري الاتصال...' : 'إعادة المحاولة'}</Button>
+  </main>;
 
   // Car Dashboard View
   if (selectedCar) {
