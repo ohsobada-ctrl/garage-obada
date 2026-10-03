@@ -124,8 +124,10 @@ export const NotificationService = {
         if (pending.notifications.length) await LocalNotifications.cancel(pending);
       } catch { /* The OS may deny access after permissions were revoked. */ }
     } else if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration('/');
-      await (await reg?.pushManager?.getSubscription())?.unsubscribe().catch(() => {});
+      try {
+        const reg = await navigator.serviceWorker.getRegistration('/');
+        await (await reg?.pushManager?.getSubscription())?.unsubscribe();
+      } catch { /* Server detachment already stopped deliveries to this device. */ }
     }
     localStorage.setItem('garage_push_enabled', 'false');
     localStorage.removeItem('garage_device_id');

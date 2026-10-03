@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/backendError";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Mail, 
@@ -104,8 +105,8 @@ export default function Auth() {
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       toast.success("تم تسجيل الدخول بنجاح");
       navigate(nextPath, { replace: true });
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(errorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -139,7 +140,7 @@ export default function Auth() {
     try {
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       const { data, error } = await supabase.auth.signUp({
-        email: email.toLowerCase(),
+        email: email.toLowerCase().trim(),
         password,
         options: {
           data: {
@@ -165,8 +166,8 @@ export default function Auth() {
         setOtpToken("");
         setMode("verify_signup");
       }
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(errorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -181,15 +182,15 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase(), {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
         redirectTo: `${window.location.origin}/auth`,
       });
       if (error) throw error;
       toast.success("تم إرسال رمز استعادة كلمة المرور إلى بريدك الإلكتروني");
       setOtpToken("");
       setMode("verify_recovery");
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(errorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -206,7 +207,7 @@ export default function Auth() {
     try {
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       const { data, error } = await supabase.auth.verifyOtp({
-        email: email.toLowerCase(),
+        email: email.toLowerCase().trim(),
         token: otpToken,
         type: "signup",
       });
@@ -216,8 +217,8 @@ export default function Auth() {
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       toast.success("تم تأكيد الحساب وتسجيل الدخول بنجاح!");
       navigate(nextPath, { replace: true });
-    } catch (error: any) {
-      toast.error(error.message || "رمز التحقق غير صحيح");
+    } catch (error) {
+      toast.error(errorMessage(error, "رمز التحقق غير صحيح"));
     } finally {
       setLoading(false);
     }
@@ -234,7 +235,7 @@ export default function Auth() {
     try {
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       const { data, error } = await supabase.auth.verifyOtp({
-        email: email.toLowerCase(),
+        email: email.toLowerCase().trim(),
         token: otpToken,
         type: "recovery",
       });
@@ -243,8 +244,8 @@ export default function Auth() {
 
       toast.success("تم التحقق بنجاح! يرجى إدخال كلمة المرور الجديدة.");
       setMode("reset_password");
-    } catch (error: any) {
-      toast.error(error.message || "رمز استعادة الحساب غير صحيح");
+    } catch (error) {
+      toast.error(errorMessage(error, "رمز استعادة الحساب غير صحيح"));
     } finally {
       setLoading(false);
     }
@@ -273,8 +274,8 @@ export default function Auth() {
       if (error) throw error;
       toast.success("تم تحديث كلمة المرور بنجاح! تم تسجيل دخولك.");
       navigate(nextPath, { replace: true });
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(errorMessage(error));
     } finally {
       setLoading(false);
     }

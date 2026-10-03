@@ -49,3 +49,15 @@ test('a notification opened from push waits for inbox data before marking read',
   await waitFor(() => assert.deepEqual(calls, [item.id]));
   view.unmount();
 });
+
+test('a failed read update keeps the item unread and reopening retries quietly', async () => {
+  let attempts = 0;
+  const view = render(React.createElement(NotificationCenter, { notifications: [item], onRead: async () => { attempts++; throw new Error('offline'); } }));
+  fireEvent.click(view.getByRole('button', { expanded: false }));
+  await waitFor(() => assert.equal(attempts, 1));
+  assert.ok(view.getByLabelText('غير مقروء'));
+  fireEvent.click(view.getByRole('button', { expanded: true }));
+  fireEvent.click(view.getByRole('button', { expanded: false }));
+  await waitFor(() => assert.equal(attempts, 2));
+  view.unmount();
+});

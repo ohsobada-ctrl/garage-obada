@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { User, Loader2, Save, Camera } from "lucide-react";
+import { errorMessage } from '@/lib/backendError';
 
 interface ProfileDialogProps {
   children?: React.ReactNode;
@@ -20,52 +21,54 @@ export function ProfileDialog({ children }: ProfileDialogProps) {
   const [phone, setPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [open, setOpen] = useState(false);
+  const userId = user?.uid;
+  const userPhone = user?.phoneNumber || user?.phone || '';
 
   useEffect(() => {
-    if (user && open) {
-      getProfile();
-    }
-  }, [user, open]);
+    if (!userId || !open) return;
+    let active = true;
+    async function getProfile() {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("full_name, phone, avatar_url")
+          .eq("id", userId)
+          .maybeSingle();
 
-  async function getProfile() {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("full_name, phone, avatar_url")
-        .eq("id", user?.uid)
-        .single();
+        if (error) throw error;
+        if (!active) return;
 
-      if (error && error.code !== "PGRST116") throw error;
-      
-      if (data) {
-        setFullName(data.full_name || "");
-        setPhone(data.phone || user?.phoneNumber || "");
-        setAvatarUrl(data.avatar_url || "");
+        setFullName(data?.full_name || "");
+        setPhone(data?.phone || userPhone);
+        setAvatarUrl(data?.avatar_url || "");
+      } catch (error) {
+        if (active) toast.error("خطأ في جلب البيانات: " + errorMessage(error));
+      } finally {
+        if (active) setLoading(false);
       }
-    } catch (error: any) {
-      toast.error("خطأ في جلب البيانات: " + error.message);
-    } finally {
-      setLoading(false);
     }
-  }
+    void getProfile();
+    return () => { active = false; };
+  }, [userId, userPhone, open]);
 
   async function updateProfile() {
+    if (!userId || loading) return;
     try {
       setLoading(true);
       const { error } = await supabase.from("profiles").upsert({
-        id: user?.uid,
+        id: userId,
         full_name: fullName,
         phone: phone,
         avatar_url: avatarUrl,
-        updated_at: new Date().toISOString(),
       });
 
       if (error) throw error;
       toast.success("تم تحديث الملف الشخصي بنجاح");
+      window.dispatchEvent(new Event('garage_profile_changed'));
       setOpen(false);
-    } catch (error: any) {
-      toast.error("خطأ في التحديث: " + error.message);
+    } catch (error) {
+      toast.error("خطأ في التحديث: " + errorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -96,7 +99,7 @@ export function ProfileDialog({ children }: ProfileDialogProps) {
             قم بتحديث معلوماتك الشخصية ليظهر اسمك بشكل صحيح في التطبيق.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="flex flex-col items-center justify-center py-4 space-y-4">
           <div className="relative">
             <Avatar className="w-24 h-24 border-4 border-secondary shadow-xl">
@@ -109,13 +112,13 @@ export function ProfileDialog({ children }: ProfileDialogProps) {
               <Camera className="w-4 h-4" />
             </Button>
           </div>
-          
+
           <div className="w-full space-y-4 pt-4">
             <div className="space-y-2">
               <Label htmlFor="fullName">الاسم الكامل</Label>
-              <Input 
-                id="fullName" 
-                value={fullName} 
+              <Input
+                id="fullName"
+                value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="أدخل اسمك الكامل"
                 className="text-right"
@@ -123,9 +126,9 @@ export function ProfileDialog({ children }: ProfileDialogProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="profilePhone">رقم الهاتف</Label>
-              <Input 
-                id="profilePhone" 
-                value={phone} 
+              <Input
+                id="profilePhone"
+                value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="9x xxx xxxx"
                 className="text-right"
@@ -133,9 +136,9 @@ export function ProfileDialog({ children }: ProfileDialogProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="avatar">رابط الصورة (URL)</Label>
-              <Input 
-                id="avatar" 
-                value={avatarUrl} 
+              <Input
+                id="avatar"
+                value={avatarUrl}
                 onChange={(e) => setAvatarUrl(e.target.value)}
                 placeholder="https://example.com/avatar.jpg"
                 className="text-right"

@@ -26,7 +26,7 @@ test('private server keys cannot initialize the browser client', () => {
   for (const key of ['sb_secret_test', jwt('example', 'service_role')]) assert.throws(() => resolve({ VITE_SUPABASE_URL: 'https://example.supabase.co', VITE_SUPABASE_ANON_KEY: key }));
 });
 test('missing schema does not retry endlessly; transient outages can recover', () => {
-  for (const code of ['PGRST202', 'PGRST205', '42501']) assert.equal(shouldRetryBackend(0, { code }), false);
+  for (const code of ['PGRST202', 'PGRST205', '42501', 'PGRST301', 'PGRST303']) assert.equal(shouldRetryBackend(0, { code }), false);
   assert.equal(shouldRetryBackend(0, { message: 'Failed to fetch' }), true);
   assert.equal(shouldRetryBackend(2, { message: 'Failed to fetch' }), false);
 });

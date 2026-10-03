@@ -19,29 +19,32 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
   const { user, signOut } = useAuth();
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const userId = user?.uid;
 
   useEffect(() => {
-    if (user?.uid) {
-      loadProfile();
-    }
-  }, [user]);
+    setFullName(''); setAvatarUrl('');
+    if (!userId) return;
+    let active = true;
+    async function loadProfile() {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
 
-  async function loadProfile() {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.uid)
-        .single();
-      
-      if (data) {
-        setFullName(data.full_name || "");
-        setAvatarUrl(data.avatar_url || "");
+        if (active && data && !error) {
+          setFullName(data.full_name || "");
+          setAvatarUrl(data.avatar_url || "");
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
       }
-    } catch (error) {
-      console.error('Error loading profile:', error);
     }
-  }
+    void loadProfile();
+    window.addEventListener('garage_profile_changed', loadProfile);
+    return () => { active = false; window.removeEventListener('garage_profile_changed', loadProfile); };
+  }, [userId]);
 
   const handleSignOut = async () => {
     try { await signOut(); } catch { toast.error('تعذر تسجيل الخروج بأمان. تحقق من الاتصال وحاول مجدداً'); }
@@ -55,18 +58,18 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
         </button>
       </SheetTrigger>
       <SheetContent side="right" className="w-[85vw] sm:w-[350px] font-tajawal p-0 flex flex-col bg-background/95 backdrop-blur-xl border-l-border/30">
-        
+
         {/* User Profile Header section */}
         <div className="p-6 bg-secondary/20 border-b border-border/40 flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
-          
+
           <Avatar className="w-20 h-20 border-2 border-primary/40 shadow-lg gold-glow-sm">
             <AvatarImage src={avatarUrl} />
             <AvatarFallback className="bg-primary/20 text-primary text-xl">
               {fullName?.charAt(0) || user?.phoneNumber?.charAt(0) || "?"}
             </AvatarFallback>
           </Avatar>
-          
+
           <div>
             <h2 className="text-lg font-bold">{fullName || user?.phoneNumber || user?.phone || 'مستخدم'}</h2>
             {user?.isAdmin && (
@@ -80,7 +83,7 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
 
         {/* Menu Items */}
         <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          
+
           <ProfileDialog>
             <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-secondary/40 transition-colors text-right group">
               <div className="flex items-center gap-3">
@@ -95,7 +98,7 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
 
           {user?.isAdmin && (
             <AdminDashboard carsCount={carsCount}>
-              <button 
+              <button
                 className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-secondary/40 transition-colors text-right group"
               >
                 <div className="flex items-center gap-3">
@@ -137,9 +140,9 @@ export function SideDrawer({ carsCount }: SideDrawerProps) {
 
         {/* Footer Area with Logout */}
         <div className="p-4 border-t border-border/40">
-          <Button 
-            variant="ghost" 
-            onClick={handleSignOut} 
+          <Button
+            variant="ghost"
+            onClick={handleSignOut}
             className="w-full flex items-center justify-center gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive h-12 rounded-xl"
           >
             <LogOut className="w-5 h-5" />

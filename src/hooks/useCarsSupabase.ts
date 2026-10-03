@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Car, defaultCarSettings } from "@/types/car";
+import { Car, CarSettings, LegalDocument, OilService, BrakeTireService, defaultCarSettings } from "@/types/car";
+import type { Database, Json } from '@/integrations/supabase/types';
 import { toast } from "sonner";
 import { backendError, shouldRetryBackend } from '@/lib/backendError';
 
@@ -23,7 +24,7 @@ export function useCarsSupabase() {
       if (error) throw error;
 
       // Transform DB records to local Car type
-      return data.map((record: any) => ({
+      return data.map((record: Database['public']['Tables']['cars']['Row']) => ({
         id: record.id,
         make: record.make,
         model: record.model,
@@ -35,7 +36,7 @@ export function useCarsSupabase() {
         oilServices: record.oil_services || [],
         brakeTireServices: record.brake_tire_services || [],
         mileageHistory: record.mileage_history || [],
-      })) as Car[];
+      })) as unknown as Car[];
     },
     enabled: !!user,
     retry: shouldRetryBackend,
@@ -74,7 +75,7 @@ export function useCarsSupabase() {
       queryClient.invalidateQueries({ queryKey: ["cars"] });
       toast.success("تمت إضافة السيارة بنجاح");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error("خطأ في إضافة السيارة: " + error.message);
     },
   });
@@ -83,17 +84,17 @@ export function useCarsSupabase() {
   const updateCarMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Car> }) => {
       // Transform local updates to DB fields
-      const dbUpdates: any = {};
+      const dbUpdates: Database['public']['Tables']['cars']['Update'] = {};
       if (updates.make) dbUpdates.make = updates.make;
       if (updates.model) dbUpdates.model = updates.model;
       if (updates.year) dbUpdates.year = updates.year;
       if (updates.currentMileage !== undefined) dbUpdates.current_mileage = updates.currentMileage;
       if (updates.lastMileageUpdate) dbUpdates.last_mileage_update = updates.lastMileageUpdate;
-      if (updates.settings) dbUpdates.settings = updates.settings;
-      if (updates.legalDocs) dbUpdates.legal_docs = updates.legalDocs;
-      if (updates.oilServices) dbUpdates.oil_services = updates.oilServices;
-      if (updates.brakeTireServices) dbUpdates.brake_tire_services = updates.brakeTireServices;
-      if (updates.mileageHistory) dbUpdates.mileage_history = updates.mileageHistory;
+      if (updates.settings) dbUpdates.settings = updates.settings as unknown as Json;
+      if (updates.legalDocs) dbUpdates.legal_docs = updates.legalDocs as unknown as Json;
+      if (updates.oilServices) dbUpdates.oil_services = updates.oilServices as unknown as Json;
+      if (updates.brakeTireServices) dbUpdates.brake_tire_services = updates.brakeTireServices as unknown as Json;
+      if (updates.mileageHistory) dbUpdates.mileage_history = updates.mileageHistory as unknown as Json;
 
       const { error } = await supabase
         .from("cars")
@@ -125,7 +126,7 @@ export function useCarsSupabase() {
   });
 
   // Helper Wrappers
-  const addLegalDoc = (carId: string, doc: any) => {
+  const addLegalDoc = (carId: string, doc: Omit<LegalDocument, 'id'>) => {
     const car = cars.find(c => c.id === carId);
     if (!car) return;
     const filtered = car.legalDocs.filter(d => d.type !== doc.type);
@@ -135,7 +136,7 @@ export function useCarsSupabase() {
     });
   };
 
-  const addOilService = (carId: string, service: any) => {
+  const addOilService = (carId: string, service: Omit<OilService, 'id'>) => {
     const car = cars.find(c => c.id === carId);
     if (!car) return;
     updateCarMutation.mutate({ 
@@ -148,7 +149,7 @@ export function useCarsSupabase() {
     });
   };
 
-  const addBrakeTireService = (carId: string, service: any) => {
+  const addBrakeTireService = (carId: string, service: Omit<BrakeTireService, 'id'>) => {
     const car = cars.find(c => c.id === carId);
     if (!car) return;
     const filtered = car.brakeTireServices.filter(s => s.type !== service.type);
@@ -172,7 +173,7 @@ export function useCarsSupabase() {
     });
   };
 
-  const updateCarSettings = (carId: string, settings: any) => {
+  const updateCarSettings = (carId: string, settings: Partial<CarSettings>) => {
     const car = cars.find(c => c.id === carId);
     if (!car) return;
     updateCarMutation.mutate({ 

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, unlinkSync, rmdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -54,6 +54,10 @@ try {
   console.error(error.message);
   process.exitCode = 1;
 } finally {
-  // Only the exact temporary directory created above is removed.
-  if (taskDir) rmSync(taskDir, { recursive: true, force: true });
+  // Only the file created here and its empty directory are removed.
+  if (taskDir) {
+    const sqlFile = join(taskDir, 'repair.sql');
+    if (existsSync(sqlFile)) unlinkSync(sqlFile);
+    rmdirSync(taskDir);
+  }
 }

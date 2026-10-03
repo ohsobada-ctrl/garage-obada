@@ -5,7 +5,7 @@ self.addEventListener('push', event => {
   let data = {};
   try { data = event.data?.json() || {}; } catch { data = { body: event.data?.text() }; }
   event.waitUntil(self.registration.showNotification(data.title || 'كراج', {
-    body: data.body || '', icon: '/favicon.ico', tag: data.id || 'garage', data: { url: data.id ? '/?notification=' + encodeURIComponent(data.id) : '/' },
+    body: data.body || '', icon: '/app-icon-192.png', tag: data.id || 'garage', data: { url: data.id ? '/?notification=' + encodeURIComponent(data.id) : '/' },
   }));
 });
 self.addEventListener('notificationclick', event => {

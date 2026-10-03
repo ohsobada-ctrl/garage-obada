@@ -15,23 +15,27 @@ Workflow `Update notification backend` يطبّق الإصلاح وينشر دا
 إعداد مفاتيح VAPID وFCM/APNs والمجدول أدناه مطلوب أيضاً لتسليم Push بالخلفية.
 تسجيل الدخول إلى لوحة Supabase في المتصفح لا يسجّل CLI تلقائياً.
 
-فحص 2 أكتوبر 2026: خدمة Auth وجدول cars يردان بنجاح؛ جداول
-notification_inbox وmaintenance_reminders وpush_devices ترجع PGRST205، ودالة
-garage_admin_report ترجع PGRST202. الاتصال الأساسي يعمل؛ مخطط الإشعارات غير مطبق.
-شغّل `npm run check:database` قبل النشر. الفحص للقراءة فقط ولا يعرض المفاتيح.
+الأمر `npm run setup:push` يضبط مفاتيح Web Push على الخادم، وينشر دالة الإرسال،
+ويحدّث Vault والمجدول كل دقيقة تلقائياً. يقرأ من بيئة النشر:
+`WEB_PUSH_PUBLIC_KEY` و`WEB_PUSH_PRIVATE_KEY` و`WEB_PUSH_SUBJECT`
+و`NOTIFICATION_CRON_SECRET`. ضعها أيضاً في GitHub environment باسم production
+لاستخدام workflow. الأمر يتحقق من تطابق زوج VAPID ولا يولد مفاتيح جديدة عند
+كل نشر، حفاظاً على اشتراكات الأجهزة. `npm run setup:push:preview` يعرض الخطة
+دون تعديل الخادم. إعداد FCM/APNs للتطبيقات الأصلية يبقى مطلوباً بشكل منفصل.
+
+آخر فحص في 4 أكتوبر 2026: خدمة Auth وجدول cars وصندوق التنبيهات والتذكيرات
+ودالة إحصائيات الأدمن موجودة. خدمة dispatch-notifications ترجع HTTP 404،
+ومفتاح إشعارات الويب غير مضبوط في إعدادات البناء المحلية؛ لذلك تسليم Push لم يُثبت بعد.
+شغّل `npm run check:database` لفحص المخطط، و`npm run check:release` لفحص
+المخطط ومفتاح الواجهة ووجود خدمة الإرسال. الفحصان للقراءة فقط ولا يرسلان إشعارات.
 
 الواجهة تقبل `VITE_SUPABASE_PUBLISHABLE_KEY` أو `VITE_SUPABASE_ANON_KEY`
 مع `VITE_SUPABASE_URL` لنفس المشروع. تمت إزالة الاتصال الاحتياطي بمشروع ثابت.
 بعد تعديل إعدادات النشر يجب إعادة بناء الموقع. لا تستعمل service_role في الواجهة.
 
-التشخيص المؤكد: مشروع الواجهة في `.env` هو `ufaqfqcbovgkpqlujnxo`. طلب قراءة
-`garage_admin_report` رجع `404 / PGRST202`: الدالة غير موجودة. وجود
-`is_garage_admin` وحدها لا يعني أن تحديث الإشعارات كامل. ملف CLI كان يشير إلى
-مشروع مختلف؛ استخدم المشروع الصحيح صراحة عند النشر.
-
 ## 1. إصلاح الإحصائيات والإرسال داخل التطبيق
 
-في SQL Editor للمشروع المستخدم فعلياً، نفّذ ملف
+المسار الآلي هو `npm run setup:database`. للاستعادة اليدوية فقط، نفّذ ملف
 `supabase/migrations/20261001010000_repair_notification_setup.sql` كاملاً.
 الملف قابل لإعادة التنفيذ، ويصلح الدوال والسياسات ويعيد تحميل schema cache.
 لا يحذف بيانات السيارات ولا رسائل المستخدمين.
@@ -88,6 +92,10 @@ supabase functions deploy dispatch-notifications --project-ref ufaqfqcbovgkpqluj
 
 نفّذ `npm install` و`npm run build` و`npx cap sync`.
 Android يحتاج `android/app/google-services.json` للمشروع الصحيح.
+Workflow بناء Android يقرأ `GOOGLE_SERVICES_JSON` من أسرار production ويتحقق من
+معرّف التطبيق، ويقرأ إعدادات Supabase العامة من `VITE_SUPABASE_URL` و
+`VITE_SUPABASE_PUBLISHABLE_KEY` (أو `VITE_SUPABASE_ANON_KEY`). لا ينشر نسخة
+بإعدادات اتصال ناقصة. مفتاح حساب خدمة FCM يبقى في أسرار الخادم فقط.
 iOS يحتاج تفعيل Push Notifications capability في Xcode وتوقيع التطبيق مع
 entitlement الخاص بـ aps-environment. تم توصيل callbacks في AppDelegate، لكن
 الشهادات والتوقيع يجب ضبطها في حساب Apple. أعد بناء التطبيق وثبّته.
@@ -107,6 +115,17 @@ token. «قبله مزوّد Push» لا يثبت عرضه؛ تحقق فعليا
 
 الاختبارات المحلية: `node --test tests/notifications.test.mjs` و
 `npx tsc --noEmit -p tsconfig.app.json` و`npm run build`.
+
+الفحص الكامل: `npm test` و`npm run typecheck` و`npm run lint` و`npm run build`.
+يشمل اختبارات القراءة عند فتح الرسالة، فتح الرسالة من Push، حفظ جلسة «تذكرني»،
+وصلاحيات قاعدة البيانات والتوزيع لكل الحسابات والأجهزة ومنع تكرار البث.
+
+أزيل مفتاح Telegram المكتوب مباشرة في دالة البوت القديمة. يجب إلغاء المفتاح
+القديم واستبداله في خدمة Telegram ثم ضبط `TELEGRAM_BOT_TOKEN` في أسرار الخادم؛
+حذفه من الملف الحالي لا يحذفه من تاريخ المستودع.
+دالة Telegram القديمة تتطلب أيضاً `TELEGRAM_WEBHOOK_SECRET` المطابق لقيمة
+`secret_token` عند تسجيل webhook؛ الطلبات غير الموقعة ترفض. دخول كراج الحالي
+يستخدم Supabase Auth ولا يعتمد على هذا البوت القديم.
 
 المراجع الرسمية: https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/
 و https://capacitorjs.com/docs/apis/push-notifications
