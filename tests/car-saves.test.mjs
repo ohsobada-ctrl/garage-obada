@@ -11,7 +11,7 @@ const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true });
-for (const key of ['HTMLElement', 'HTMLInputElement', 'Element', 'Node', 'DocumentFragment', 'CustomEvent', 'MutationObserver', 'getComputedStyle']) globalThis[key] = dom.window[key];
+for (const key of ['HTMLElement', 'HTMLInputElement', 'Element', 'Node', 'NodeFilter', 'DocumentFragment', 'CustomEvent', 'MutationObserver', 'getComputedStyle']) globalThis[key] = dom.window[key];
 const { render, fireEvent, waitFor, cleanup } = await import('@testing-library/react');
 const output = new URL(`./.generated-car-${process.pid}.mjs`, import.meta.url);
 const bundle = await build({ stdin: { contents: `export { AddCarDialog } from './src/components/AddCarDialog'; export { MileagePrompt } from './src/components/MileagePrompt'; export { updateOwnedCar, carFromRow } from './src/lib/carData';`, resolveDir: process.cwd() }, bundle: true, write: false,

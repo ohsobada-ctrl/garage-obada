@@ -11,6 +11,7 @@ globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true });
 globalThis.HTMLElement = dom.window.HTMLElement;
+for (const key of ['HTMLInputElement', 'Element', 'Node', 'NodeFilter', 'DocumentFragment', 'CustomEvent', 'MutationObserver', 'getComputedStyle']) globalThis[key] = dom.window[key];
 const { render, fireEvent, waitFor, cleanup } = await import('@testing-library/react');
 const output = new URL(`./.generated-notification-${process.pid}.mjs`, import.meta.url);
 const bundle = await build({ entryPoints: ['src/components/NotificationCenter.tsx'], bundle: true, write: false,
