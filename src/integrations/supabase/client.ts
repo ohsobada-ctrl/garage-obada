@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { sessionStorageAdapter } from '@/lib/sessionStorage';
-import { resolveSupabaseConfig } from '@/lib/supabaseConfig';
+import { resolveClientSupabaseConfig } from '@/lib/supabaseConfig';
 
-const { url: supabaseUrl, key: supabaseAnonKey } = resolveSupabaseConfig(import.meta.env);
+const { url: supabaseUrl, key: supabaseAnonKey } = resolveClientSupabaseConfig(import.meta.env);
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

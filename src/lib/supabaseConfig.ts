@@ -1,5 +1,25 @@
 type PublicEnvironment = Record<string, string | boolean | undefined>;
 
+export const DEFAULT_SUPABASE_URL = 'https://ufaqfqcbovgkpqlujnxo.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmYXFmcWNib3Zna3BxbHVqbnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MTc1MTIsImV4cCI6MjA5Mzk5MzUxMn0.yWOTOCQN_3VM8FY2-vag_Ul6f_v0mLD365O4NTKr8p0';
+
+export function resolveClientSupabaseConfig(env: PublicEnvironment = {}) {
+  const hasConfig = Boolean(
+    (env.VITE_SUPABASE_URL || env.LOVABLE_SUPABASE_URL) &&
+    (env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || env.LOVABLE_SUPABASE_PUBLISHABLE_KEY || env.LOVABLE_SUPABASE_ANON_KEY)
+  );
+
+  if (hasConfig) {
+    return resolveSupabaseConfig(env);
+  }
+
+  return resolveSupabaseConfig({
+    ...env,
+    VITE_SUPABASE_URL: env.VITE_SUPABASE_URL || env.LOVABLE_SUPABASE_URL || DEFAULT_SUPABASE_URL,
+    VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || env.LOVABLE_SUPABASE_PUBLISHABLE_KEY || env.LOVABLE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
+  });
+}
+
 export function resolveSupabaseConfig(env: PublicEnvironment) {
   const url = String(env.VITE_SUPABASE_URL || env.LOVABLE_SUPABASE_URL || '').trim();
   // Keep URL and key from the same environment group; never fall back to a different project.
