@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
 import { Droplets, MapPin, Calendar, Gauge, Filter, Plus, History, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,13 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OilService as OilServiceType, CarSettings } from '@/types/car';
 import { cn } from '@/lib/utils';
+import { useSaveAction } from '@/hooks/useSaveAction';
 
 interface OilServiceProps {
   services: OilServiceType[];
   currentMileage: number;
   settings: CarSettings;
-  onAdd: (service: Omit<OilServiceType, 'id'>) => void;
-  onUpdateSettings: (settings: Partial<CarSettings>) => void;
+  onAdd: (service: Omit<OilServiceType, 'id'>) => Promise<unknown>;
+  onUpdateSettings: (settings: Partial<CarSettings>) => Promise<unknown>;
 }
 
 // Get unique suggestions from previous services
@@ -29,9 +31,12 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
   const [open, setOpen] = useState(false);
   const [stationName, setStationName] = useState('');
   const [oilBrand, setOilBrand] = useState('');
-  const [dateOfChange, setDateOfChange] = useState(new Date().toISOString().split('T')[0]);
+  const [dateOfChange, setDateOfChange] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [mileageAtChange, setMileageAtChange] = useState(currentMileage);
   const [filterChanged, setFilterChanged] = useState(true);
+  const [expiryMonths, setExpiryMonths] = useState(String(settings.oilExpiryMonths));
+  const [rangeKm, setRangeKm] = useState(String(settings.oilRangeKm));
+  const { saving, saveError, save } = useSaveAction();
 
   const latestService = services[services.length - 1];
   const previousServices = services.slice(0, -1).reverse();
@@ -39,6 +44,12 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
 
   // Pre-fill with last used values when opening dialog
   const handleOpenChange = (isOpen: boolean) => {
+    if (saving) return;
+    if (isOpen) {
+      setMileageAtChange(currentMileage);
+      setExpiryMonths(String(settings.oilExpiryMonths));
+      setRangeKm(String(settings.oilRangeKm));
+    }
     if (isOpen && latestService) {
       setStationName(latestService.stationName);
       setOilBrand(latestService.oilBrand);
@@ -70,24 +81,29 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
 
   const status = getServiceStatus();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stationName.trim() || !oilBrand.trim()) return;
     
-    onAdd({
+    if (!await save(() => onAdd({
       stationName: stationName.trim(),
       oilBrand: oilBrand.trim(),
       dateOfChange,
       mileageAtChange,
       filterChanged,
-    });
+    }))) return;
     
     setStationName('');
     setOilBrand('');
-    setDateOfChange(new Date().toISOString().split('T')[0]);
+    setDateOfChange(format(new Date(), 'yyyy-MM-dd'));
     setMileageAtChange(currentMileage);
     setFilterChanged(true);
     setOpen(false);
+  };
+
+  const handleSettingsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (await save(() => onUpdateSettings({ oilExpiryMonths: Number(expiryMonths), oilRangeKm: Number(rangeKm) }))) setOpen(false);
   };
 
   return (
@@ -115,6 +131,7 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
               </TabsList>
               <TabsContent value="service">
                 <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                  <fieldset disabled={saving} className="contents">
                   <div className="space-y-2">
                     <Label>مكان التعبئة</Label>
                     <div className="relative">
@@ -158,6 +175,7 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                       <Label>التاريخ</Label>
                       <Input
                         type="date"
+                        max={format(new Date(), 'yyyy-MM-dd')}
                         value={dateOfChange}
                         onChange={(e) => setDateOfChange(e.target.value)}
                         required
@@ -167,8 +185,9 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                       <Label>العداد (كم)</Label>
                       <Input
                         type="number"
-                        value={mileageAtChange}
-                        onChange={(e) => setMileageAtChange(parseInt(e.target.value) || 0)}
+                        min={0}
+                        value={Number.isNaN(mileageAtChange) ? '' : mileageAtChange}
+                        onChange={(e) => setMileageAtChange(e.target.valueAsNumber)}
                         required
                       />
                     </div>
@@ -194,12 +213,16 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                       تم تغيير الفلتر
                     </Label>
                   </div>
-                  <Button type="submit" variant="gold" className="w-full">
-                    حفظ الخدمة
+                  {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+                  <Button type="submit" variant="gold" className="w-full" disabled={saving}>
+                    {saving ? 'جاري الحفظ...' : 'حفظ الخدمة'}
                   </Button>
+                  </fieldset>
                 </form>
               </TabsContent>
               <TabsContent value="settings" className="space-y-4 mt-4">
+                <form onSubmit={handleSettingsSubmit} className="space-y-4">
+                <fieldset disabled={saving} className="contents">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <Settings className="w-4 h-4" />
@@ -209,8 +232,9 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                     type="number"
                     min={1}
                     max={24}
-                    value={settings.oilExpiryMonths}
-                    onChange={(e) => onUpdateSettings({ oilExpiryMonths: parseInt(e.target.value) || 6 })}
+                    required
+                    value={expiryMonths}
+                    onChange={(e) => setExpiryMonths(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -223,13 +247,18 @@ export function OilService({ services, currentMileage, settings, onAdd, onUpdate
                     min={1000}
                     max={20000}
                     step={500}
-                    value={settings.oilRangeKm}
-                    onChange={(e) => onUpdateSettings({ oilRangeKm: parseInt(e.target.value) || 5000 })}
+                    required
+                    value={rangeKm}
+                    onChange={(e) => setRangeKm(e.target.value)}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
                   سيتم تنبيهك قبل انتهاء أي من الحدين
                 </p>
+                {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+                <Button type="submit" variant="gold" className="w-full" disabled={saving}>{saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}</Button>
+                </fieldset>
+                </form>
               </TabsContent>
             </Tabs>
           </DialogContent>

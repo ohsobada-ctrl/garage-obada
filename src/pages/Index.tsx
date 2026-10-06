@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
-import { Car, Bell, Plus, ArrowRight, Gauge, Trash2, ShieldCheck } from 'lucide-react';
+import { Car, Bell, Plus, ArrowRight, Gauge, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { NotificationService } from "@/services/notificationService";
 import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { AddCarDialog } from '@/components/AddCarDialog';
@@ -23,10 +22,8 @@ import { MileagePrompt } from '@/components/MileagePrompt';
 import { MileageEditor } from '@/components/MileageEditor';
 import { useCarsSupabase } from '@/hooks/useCarsSupabase';
 import { useNotifications, shouldShowMileagePrompt, markMileagePromptShown } from '@/hooks/useCars';
-import { useAuth } from '@/lib/auth';
 import { Car as CarType } from '@/types/car';
-import { cn } from '@/lib/utils';
-import { LogOut } from 'lucide-react';
+import { useSaveAction } from '@/hooks/useSaveAction';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,12 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { supabase } from "@/integrations/supabase/client";
-
-import type { Notification } from '@/types/car';
-
 const Index = () => {
-  const { user, signOut } = useAuth();
   const {
     cars,
     isLoaded,
@@ -87,6 +79,7 @@ const Index = () => {
   const [showMileagePrompt, setShowMileagePrompt] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [carToDelete, setCarToDelete] = useState<CarType | null>(null);
+  const { saving: deleting, saveError: deleteError, save: saveDelete } = useSaveAction();
 
   const allNotifications = [...broadcasts, ...notifications];
   const unreadCount = broadcasts.filter(item => !item.readAt).length + notifications.length;
@@ -106,15 +99,15 @@ const Index = () => {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (carToDelete) {
-      deleteCar(carToDelete.id);
+  const confirmDelete = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    if (carToDelete && await saveDelete(() => deleteCar(carToDelete.id))) {
       if (selectedCar?.id === carToDelete.id) {
         setSelectedCar(null);
       }
+      setDeleteDialogOpen(false);
+      setCarToDelete(null);
     }
-    setDeleteDialogOpen(false);
-    setCarToDelete(null);
   };
 
   if (!isLoaded) {
@@ -136,7 +129,6 @@ const Index = () => {
   // Car Dashboard View
   if (selectedCar) {
     const car = cars.find(c => c.id === selectedCar.id) || selectedCar;
-    const carNotifications = notifications.filter(n => n.carId === car.id);
 
     return (
       <div className="min-h-screen pb-8">
@@ -245,7 +237,7 @@ const Index = () => {
           />
           <CustomReminders carId={car.id} />
           {/* Delete Confirmation Dialog */}
-          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialog open={deleteDialogOpen} onOpenChange={value => { if (!deleting) setDeleteDialogOpen(value); }}>
             <AlertDialogContent className="fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 font-tajawal text-right">
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-xl font-bold">حذف السيارة</AlertDialogTitle>
@@ -254,14 +246,16 @@ const Index = () => {
                   سيتم حذف جميع البيانات والسجلات المرتبطة بها نهائياً.
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
               <AlertDialogFooter className="flex flex-row-reverse gap-3 mt-6">
                 <AlertDialogAction
                   onClick={confirmDelete}
+                  disabled={deleting}
                   className="bg-red-600 text-white hover:bg-red-700 flex-1 py-6 text-lg font-bold"
                 >
-                  نعم، احذف السيارة
+                  {deleting ? 'جاري الحذف...' : 'نعم، احذف السيارة'}
                 </AlertDialogAction>
-                <AlertDialogCancel className="flex-1 mt-0 py-6 text-lg">
+                <AlertDialogCancel disabled={deleting} className="flex-1 mt-0 py-6 text-lg">
                   إلغاء
                 </AlertDialogCancel>
               </AlertDialogFooter>
@@ -375,7 +369,7 @@ const Index = () => {
       </main>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={value => { if (!deleting) setDeleteDialogOpen(value); }}>
         <AlertDialogContent className="fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 font-tajawal text-right">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-bold">حذف السيارة</AlertDialogTitle>
@@ -384,14 +378,16 @@ const Index = () => {
               سيتم حذف جميع البيانات والسجلات المرتبطة بها نهائياً.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
           <AlertDialogFooter className="flex flex-row-reverse gap-3 mt-6">
             <AlertDialogAction
               onClick={confirmDelete}
+              disabled={deleting}
               className="bg-red-600 text-white hover:bg-red-700 flex-1 py-6 text-lg font-bold"
             >
-              نعم، احذف السيارة
+              {deleting ? 'جاري الحذف...' : 'نعم، احذف السيارة'}
             </AlertDialogAction>
-            <AlertDialogCancel className="flex-1 mt-0 py-6 text-lg">
+            <AlertDialogCancel disabled={deleting} className="flex-1 mt-0 py-6 text-lg">
               إلغاء
             </AlertDialogCancel>
           </AlertDialogFooter>

@@ -1,22 +1,31 @@
-import { useState } from 'react';
-import { Gauge, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Gauge } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Car } from '@/types/car';
+import { useSaveAction } from '@/hooks/useSaveAction';
 
 interface MileagePromptProps {
   cars: Car[];
   open: boolean;
   onClose: () => void;
-  onUpdate: (carId: string, mileage: number) => void;
+  onUpdate: (carId: string, mileage: number) => Promise<unknown>;
 }
 
 export function MileagePrompt({ cars, open, onClose, onUpdate }: MileagePromptProps) {
   const [selectedCar, setSelectedCar] = useState(cars[0]?.id || '');
   const [mileage, setMileage] = useState(cars[0]?.currentMileage || 0);
+  const { saving, saveError, save } = useSaveAction();
+
+  useEffect(() => {
+    if (!cars.some(car => car.id === selectedCar)) {
+      setSelectedCar(cars[0]?.id || '');
+      setMileage(cars[0]?.currentMileage || 0);
+    }
+  }, [cars, selectedCar]);
 
   const handleCarChange = (carId: string) => {
     setSelectedCar(carId);
@@ -24,16 +33,15 @@ export function MileagePrompt({ cars, open, onClose, onUpdate }: MileagePromptPr
     if (car) setMileage(car.currentMileage);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedCar && mileage > 0) {
-      onUpdate(selectedCar, mileage);
+    if (selectedCar && Number.isSafeInteger(mileage) && mileage >= 0 && await save(() => onUpdate(selectedCar, mileage))) {
       onClose();
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={value => { if (!value && !saving) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
@@ -50,6 +58,7 @@ export function MileagePrompt({ cars, open, onClose, onUpdate }: MileagePromptPr
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset disabled={saving} className="contents">
           {cars.length > 1 && (
             <div className="space-y-2">
               <Label>اختر السيارة</Label>
@@ -72,20 +81,22 @@ export function MileagePrompt({ cars, open, onClose, onUpdate }: MileagePromptPr
             <Input
               type="number"
               min={0}
-              value={mileage}
-              onChange={(e) => setMileage(parseInt(e.target.value) || 0)}
+              value={Number.isNaN(mileage) ? '' : mileage}
+              onChange={(e) => setMileage(e.target.valueAsNumber)}
               className="text-center text-xl font-bold"
               required
             />
           </div>
+          {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
           <div className="flex gap-3">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
               لاحقاً
             </Button>
-            <Button type="submit" variant="gold" className="flex-1">
-              تحديث
+            <Button type="submit" variant="gold" className="flex-1" disabled={saving || !selectedCar}>
+              {saving ? 'جاري الحفظ...' : 'تحديث'}
             </Button>
           </div>
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

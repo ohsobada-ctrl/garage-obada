@@ -8,6 +8,7 @@ on:
       - 'scripts/setup-push.mjs'
       - '.github/workflows/backend_deploy.yml'
       - 'package-lock.json'
+      - 'package.json'
   workflow_dispatch:
 
 permissions:
@@ -24,6 +25,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       WEB_PUSH_PUBLIC_KEY: ${{ secrets.WEB_PUSH_PUBLIC_KEY }}
+      VITE_WEB_PUSH_PUBLIC_KEY: ${{ secrets.VITE_WEB_PUSH_PUBLIC_KEY }}
       WEB_PUSH_PRIVATE_KEY: ${{ secrets.WEB_PUSH_PRIVATE_KEY }}
       WEB_PUSH_SUBJECT: ${{ secrets.WEB_PUSH_SUBJECT }}
       NOTIFICATION_CRON_SECRET: ${{ secrets.NOTIFICATION_CRON_SECRET }}
@@ -43,6 +45,8 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run lint
+      - name: Validate push settings before modifying the database
+        run: node scripts/setup-push.mjs --validate-only
       - name: Apply and verify notification database repair
         run: npm run setup:database
       - name: Configure and deploy Web Push and its schedule

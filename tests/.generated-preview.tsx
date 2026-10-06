@@ -1,0 +1,5 @@
+import React, {useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {NotificationCenter} from '../src/components/NotificationCenter';
+import '../src/index.css';
+function Preview(){ const [items,setItems]=useState([{id:'1',carId:'system',carName:'موعد تغيير البطارية',message:'حان موعد مراجعة بطارية سيارتك. افتح سجل الصيانة وأضف تاريخ التغيير الجديد، وسنذكّرك بالموعد القادم.',type:'legal',severity:'warning',date:new Date().toISOString(),readAt:null},{id:'2',carId:'system',carName:'رسالة من إدارة كراج',message:'تذكيرات سيارتك محفوظة في مركز التنبيهات، ويمكنك الرجوع إليها في أي وقت.',type:'legal',severity:'info',date:new Date().toISOString(),readAt:new Date().toISOString()}]); return <main style={{maxWidth:390,margin:'24px auto',padding:16}}><NotificationCenter notifications={items} onRead={async id=>setItems(old=>old.map(x=>x.id===id?{...x,readAt:new Date().toISOString()}:x))}/></main>}; createRoot(document.getElementById('root')).render(<Preview/>);

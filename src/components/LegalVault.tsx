@@ -8,10 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LegalDocument, legalDocLabels } from '@/types/car';
 import { cn } from '@/lib/utils';
+import { useSaveAction } from '@/hooks/useSaveAction';
 
 interface LegalVaultProps {
   documents: LegalDocument[];
-  onAdd: (doc: Omit<LegalDocument, 'id'>) => void;
+  onAdd: (doc: Omit<LegalDocument, 'id'>) => Promise<unknown>;
 }
 
 const docIcons = {
@@ -25,6 +26,7 @@ export function LegalVault({ documents, onAdd }: LegalVaultProps) {
   const [docType, setDocType] = useState<LegalDocument['type']>('insurance');
   const [expiryDate, setExpiryDate] = useState('');
   const [notes, setNotes] = useState('');
+  const { saving, saveError, save } = useSaveAction();
 
   const getDocStatus = (expiryDate: string) => {
     const expiry = new Date(expiryDate);
@@ -37,11 +39,11 @@ export function LegalVault({ documents, onAdd }: LegalVaultProps) {
     return { status: 'safe', text: `${daysRemaining} يوم متبقي`, days: daysRemaining };
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expiryDate) return;
     
-    onAdd({ type: docType, expiryDate, notes: notes.trim() || undefined });
+    if (!await save(() => onAdd({ type: docType, expiryDate, notes: notes.trim() || undefined }))) return;
     setExpiryDate('');
     setNotes('');
     setOpen(false);
@@ -56,7 +58,7 @@ export function LegalVault({ documents, onAdd }: LegalVaultProps) {
           <FileText className="w-5 h-5 text-primary" />
           الأوراق القانونية
         </CardTitle>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={value => { if (!saving) setOpen(value); }}>
           <DialogTrigger asChild>
             <Button variant="goldOutline" size="sm">
               <Plus className="w-4 h-4" />
@@ -68,6 +70,7 @@ export function LegalVault({ documents, onAdd }: LegalVaultProps) {
               <DialogTitle>إضافة وثيقة</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+              <fieldset disabled={saving} className="contents">
               <div className="space-y-2">
                 <Label>نوع الوثيقة</Label>
                 <Select value={docType} onValueChange={(v) => setDocType(v as LegalDocument['type'])}>
@@ -98,9 +101,11 @@ export function LegalVault({ documents, onAdd }: LegalVaultProps) {
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
-              <Button type="submit" variant="gold" className="w-full">
-                حفظ الوثيقة
+              {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+              <Button type="submit" variant="gold" className="w-full" disabled={saving}>
+                {saving ? 'جاري الحفظ...' : 'حفظ الوثيقة'}
               </Button>
+              </fieldset>
             </form>
           </DialogContent>
         </Dialog>

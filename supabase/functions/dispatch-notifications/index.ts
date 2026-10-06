@@ -28,7 +28,7 @@ async function fcmToken() {
   googleToken = { value: result.access_token, expires: Date.now() + 3000000 };
   return googleToken.value;
 }
-type Device = { platform: string; token: string; subscription: { endpoint: string; keys: { p256dh: string; auth: string } } };
+type Device = { platform: string; token: string; subscription: { endpoint: string; keys: { p256dh: string; auth: string } }; updated_at: string; user_id: string; enabled: boolean };
 type Message = { id: string; title: string; body: string };
 async function send(device: Device, message: Message) {
   if (device.platform === 'web') {
@@ -97,25 +97,39 @@ Deno.serve(async request => {
     // Bounded parallel sends; leases protect against concurrent cron invocations.
     for (let offset = 0; offset < jobs.length; offset += 10) {
       await Promise.all(jobs.slice(offset, offset + 10).map(async (job: { id: number; device_id: string; notification_id: string; attempts: number }) => {
+        let registeredDevice: Device | null = null;
+        // A delayed worker must not overwrite the result of a newer lease.
+        const updateDelivery = (values: Record<string, unknown>) => db.from('push_deliveries').update(values)
+          .eq('id', job.id).eq('status', 'processing').eq('attempts', job.attempts);
         try {
           const [{ data: device, error: deviceError }, { data: message, error: messageError }] = await Promise.all([
             db.from('push_devices').select('*').eq('id', job.device_id).maybeSingle(),
             db.from('notification_inbox').select('*').eq('id', job.notification_id).maybeSingle(),
           ]);
           if (deviceError || messageError) throw deviceError || messageError;
+          registeredDevice = device;
           if (!device || !message || !device.enabled || device.user_id !== message.user_id) {
-            await db.from('push_deliveries').update({ status: 'skipped' }).eq('id', job.id); return;
+            const { error } = await updateDelivery({ status: 'skipped' });
+            if (error) throw error;
+            return;
           }
           await send(device, pushPreview({ id: message.id, title: message.title, body: message.body }));
-          const { error } = await db.from('push_deliveries').update({ status: 'accepted', accepted_at: new Date().toISOString(), last_error: null }).eq('id', job.id);
+          const { error } = await updateDelivery({ status: 'accepted', accepted_at: new Date().toISOString(), last_error: null });
           if (error) throw error;
         } catch (error) {
-          const expired = error instanceof ProviderError && error.expired;
-          if (expired) await db.from('push_devices').update({ enabled: false }).eq('id', job.device_id);
-          await db.from('push_deliveries').update({ status: expired || job.attempts >= 8 ? 'failed' : 'pending',
+          let expired = error instanceof ProviderError && error.expired;
+          // Registration may refresh the subscription while the provider request
+          // is in flight. Only retire the exact device version that was rejected.
+          if (expired && registeredDevice) {
+            const { data: retired, error: retireError } = await db.from('push_devices').update({ enabled: false })
+              .eq('id', job.device_id).eq('user_id', registeredDevice.user_id).eq('updated_at', registeredDevice.updated_at).select('id').maybeSingle();
+            expired = !retireError && !!retired;
+          }
+          const { error: updateError } = await updateDelivery({ status: expired || job.attempts >= 8 ? 'failed' : 'pending',
             last_error: error instanceof Error ? error.message.slice(0, 200) : 'Database/network error',
             next_attempt_at: new Date(Date.now() + Math.min(3600, 30 * 2 ** job.attempts) * 1000).toISOString(),
-          }).eq('id', job.id);
+          });
+          if (updateError) console.error('Delivery result could not be saved', job.id, updateError.code);
         }
       }));
     }

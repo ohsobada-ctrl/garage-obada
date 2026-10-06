@@ -4,7 +4,7 @@
 
 بدلاً من نسخ SQL يدوياً: سجّل أداة النشر بحساب Supabase مرة واحدة عبر
 `npx supabase login`، ثم شغّل `npm run setup:database`.
-الأمر يربط المشروع المحدد في config.toml ويطبّق إصلاح الإشعارات في معاملة واحدة،
+الأمر يربط المشروع المحدد في config.toml ويطبّق إصلاح الإشعارات ثم إصلاح تحمل بيانات التذكير القديمة في معاملة واحدة،
 ثم يتحقق من وجود الجداول والدوال قبل نجاح المعاملة. يمكن تكراره بأمان.
 `npm run setup:database:preview` يعرض الخطة من غير اتصال أو تغيير البيانات.
 
@@ -22,8 +22,11 @@ Workflow `Update notification backend` يطبّق الإصلاح وينشر دا
 لاستخدام workflow. الأمر يتحقق من تطابق زوج VAPID ولا يولد مفاتيح جديدة عند
 كل نشر، حفاظاً على اشتراكات الأجهزة. `npm run setup:push:preview` يعرض الخطة
 دون تعديل الخادم. إعداد FCM/APNs للتطبيقات الأصلية يبقى مطلوباً بشكل منفصل.
+يمكن فحص إعدادات النشر دون اتصال أو تعديل بواسطة
+`node scripts/setup-push.mjs --validate-only`. يفعل workflow ذلك قبل تعديل قاعدة البيانات؛
+يشمل الفحص تطابق مفتاح الواجهة إذا ضُبط `VITE_WEB_PUSH_PUBLIC_KEY` في أسرار production.
 
-آخر فحص في 4 أكتوبر 2026: خدمة Auth وجدول cars وصندوق التنبيهات والتذكيرات
+آخر فحص للقراءة فقط في 6 أكتوبر 2026: خدمة Auth وجدول cars وصندوق التنبيهات والتذكيرات
 ودالة إحصائيات الأدمن موجودة. خدمة dispatch-notifications ترجع HTTP 404،
 ومفتاح إشعارات الويب غير مضبوط في إعدادات البناء المحلية؛ لذلك تسليم Push لم يُثبت بعد.
 شغّل `npm run check:database` لفحص المخطط، و`npm run check:release` لفحص
@@ -36,8 +39,9 @@ Workflow `Update notification backend` يطبّق الإصلاح وينشر دا
 ## 1. إصلاح الإحصائيات والإرسال داخل التطبيق
 
 المسار الآلي هو `npm run setup:database`. للاستعادة اليدوية فقط، نفّذ ملف
-`supabase/migrations/20261001010000_repair_notification_setup.sql` كاملاً.
-الملف قابل لإعادة التنفيذ، ويصلح الدوال والسياسات ويعيد تحميل schema cache.
+`supabase/migrations/20261001010000_repair_notification_setup.sql` ثم
+`supabase/migrations/20261006000000_notification_reliability.sql` بالترتيب.
+الملفان قابلان لإعادة التنفيذ، ويصلحان الدوال والسياسات ويعيدان تحميل schema cache.
 لا يحذف بيانات السيارات ولا رسائل المستخدمين.
 
 الحساب الإداري القديم `ohsobada@gmail.com` يُضاف إذا كان بريده مؤكداً.
@@ -96,6 +100,19 @@ Workflow بناء Android يقرأ `GOOGLE_SERVICES_JSON` من أسرار produc
 معرّف التطبيق، ويقرأ إعدادات Supabase العامة من `VITE_SUPABASE_URL` و
 `VITE_SUPABASE_PUBLISHABLE_KEY` (أو `VITE_SUPABASE_ANON_KEY`). لا ينشر نسخة
 بإعدادات اتصال ناقصة. مفتاح حساب خدمة FCM يبقى في أسرار الخادم فقط.
+لبناء نسخة موقّعة ضع `KEYSTORE_BASE64` و`KEYSTORE_PASSWORD` و`KEY_ALIAS` و
+`KEY_PASSWORD` في البيئة نفسها. تُفك الشهادة في مجلد مؤقت ثم تُحذف بعد البناء.
+لا توجد كلمات مرور افتراضية أو رجوع إلى شهادة المستودع. ينتج workflow ملف APK
+للتجربة وملف AAB للنشر في Play Console. زد `versionCode` عند نشر تحديث جديد.
+التطوير و`assembleDebug` لا يحتاجان أسرار توقيع الإنتاج.
+
+توجد شهادة توقيع قديمة متتبعة في `android/app/release.keystore`، وكانت لها كلمة
+مرور افتراضية في workflow. اعتبر هذه الشهادة مكشوفة لمن اطلع على المستودع أو تاريخه.
+لم نبدّل هوية توقيع تطبيق مثبت تلقائياً: قبل الإصدار العام يجب مراجعة ما إذا كانت
+شهادة رفع إلى Google Play أو شهادة توقيع مباشرة، ثم استخدام مسار الاستبدال المناسب
+في Play Console إن كانت مستخدمة، أو إنشاء هوية جديدة إذا لم يُنشر التطبيق بعد.
+إضافة `*.keystore` إلى التجاهل تمنع الملفات الجديدة فقط ولا تزيل النسخة القديمة من التاريخ.
+
 iOS يحتاج تفعيل Push Notifications capability في Xcode وتوقيع التطبيق مع
 entitlement الخاص بـ aps-environment. تم توصيل callbacks في AppDelegate، لكن
 الشهادات والتوقيع يجب ضبطها في حساب Apple. أعد بناء التطبيق وثبّته.
@@ -130,4 +147,16 @@ token. «قبله مزوّد Push» لا يثبت عرضه؛ تحقق فعليا
 المراجع الرسمية: https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/
 و https://capacitorjs.com/docs/apis/push-notifications
 و https://supabase.com/docs/guides/auth/sessions
+
+## 5. نشر الواجهة على Vercel
+
+اربط المستودع واختر Vite، ثم اضبط `VITE_SUPABASE_URL` والمفتاح العام و
+`VITE_WEB_PUSH_PUBLIC_KEY` في بيئة الإنتاج. يضبط `vercel.json` مسارات React Router
+حتى تعمل روابط مثل `/auth` عند فتحها مباشرة، ويمنع التخزين الطويل لملف `sw.js`.
+بعد اعتماد الدومين النهائي حدّث Site URL وRedirect URLs في Supabase Auth؛
+ثم أعد البناء واختبر تسجيل الدخول وفتح الإشعار من الدومين نفسه.
+Vercel تستضيف الواجهة؛ قاعدة البيانات والمستخدمون والإرسال المجدول تبقى في Supabase.
+تغيير الدومين يتطلب إعادة تثبيت/فتح تطبيق الويب وتفعيل إشعاراته على الدومين الجديد.
+
+مرجع إعداد مسارات Vite: https://vercel.com/docs/frameworks/frontend/vite
 

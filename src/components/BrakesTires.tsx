@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
 import { Disc, CircleDot, Calendar, Plus, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,19 +9,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BrakeTireService, CarSettings } from '@/types/car';
 import { cn } from '@/lib/utils';
+import { useSaveAction } from '@/hooks/useSaveAction';
 
 interface BrakesTiresProps {
   services: BrakeTireService[];
   settings: CarSettings;
-  onAdd: (service: Omit<BrakeTireService, 'id'>) => void;
-  onUpdateSettings: (settings: Partial<CarSettings>) => void;
+  onAdd: (service: Omit<BrakeTireService, 'id'>) => Promise<unknown>;
+  onUpdateSettings: (settings: Partial<CarSettings>) => Promise<unknown>;
 }
 
 export function BrakesTires({ services, settings, onAdd, onUpdateSettings }: BrakesTiresProps) {
   const [open, setOpen] = useState(false);
   const [activeType, setActiveType] = useState<'brakes' | 'tires'>('brakes');
-  const [lastChangeDate, setLastChangeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [lastChangeDate, setLastChangeDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
+  const [brakeMonths, setBrakeMonths] = useState(String(settings.brakeReminderMonths));
+  const [tireMonths, setTireMonths] = useState(String(settings.tireReminderMonths));
+  const { saving, saveError, save } = useSaveAction();
 
   const brakesService = services.find(s => s.type === 'brakes');
   const tiresService = services.find(s => s.type === 'tires');
@@ -44,16 +49,21 @@ export function BrakesTires({ services, settings, onAdd, onUpdateSettings }: Bra
   const brakesStatus = getServiceStatus(brakesService, settings.brakeReminderMonths);
   const tiresStatus = getServiceStatus(tiresService, settings.tireReminderMonths);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd({
+    if (!await save(() => onAdd({
       type: activeType,
       lastChangeDate,
       notes: notes.trim() || undefined,
-    });
-    setLastChangeDate(new Date().toISOString().split('T')[0]);
+    }))) return;
+    setLastChangeDate(format(new Date(), 'yyyy-MM-dd'));
     setNotes('');
     setOpen(false);
+  };
+
+  const handleSettingsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (await save(() => onUpdateSettings({ brakeReminderMonths: Number(brakeMonths), tireReminderMonths: Number(tireMonths) }))) setOpen(false);
   };
 
   const ServiceCard = ({ 
@@ -112,6 +122,8 @@ export function BrakesTires({ services, settings, onAdd, onUpdateSettings }: Bra
           variant="ghost"
           size="sm"
           onClick={() => {
+            setBrakeMonths(String(settings.brakeReminderMonths));
+            setTireMonths(String(settings.tireReminderMonths));
             setActiveType(type);
             setOpen(true);
           }}
@@ -166,7 +178,7 @@ export function BrakesTires({ services, settings, onAdd, onUpdateSettings }: Bra
           reminderMonths={settings.tireReminderMonths}
         />
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={value => { if (!saving) setOpen(value); }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
@@ -180,10 +192,12 @@ export function BrakesTires({ services, settings, onAdd, onUpdateSettings }: Bra
               </TabsList>
               <TabsContent value="service">
                 <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                  <fieldset disabled={saving} className="contents">
                   <div className="space-y-2">
                     <Label>تاريخ آخر تغيير/فحص</Label>
                     <Input
                       type="date"
+                      max={format(new Date(), 'yyyy-MM-dd')}
                       value={lastChangeDate}
                       onChange={(e) => setLastChangeDate(e.target.value)}
                       required
@@ -197,12 +211,16 @@ export function BrakesTires({ services, settings, onAdd, onUpdateSettings }: Bra
                       onChange={(e) => setNotes(e.target.value)}
                     />
                   </div>
-                  <Button type="submit" variant="gold" className="w-full">
-                    حفظ
+                  {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+                  <Button type="submit" variant="gold" className="w-full" disabled={saving}>
+                    {saving ? 'جاري الحفظ...' : 'حفظ'}
                   </Button>
+                  </fieldset>
                 </form>
               </TabsContent>
               <TabsContent value="settings" className="space-y-4 mt-4">
+                <form onSubmit={handleSettingsSubmit} className="space-y-4">
+                <fieldset disabled={saving} className="contents">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <Settings className="w-4 h-4" />
@@ -212,8 +230,9 @@ export function BrakesTires({ services, settings, onAdd, onUpdateSettings }: Bra
                     type="number"
                     min={1}
                     max={24}
-                    value={settings.brakeReminderMonths}
-                    onChange={(e) => onUpdateSettings({ brakeReminderMonths: parseInt(e.target.value) || 6 })}
+                    required
+                    value={brakeMonths}
+                    onChange={(e) => setBrakeMonths(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -225,10 +244,15 @@ export function BrakesTires({ services, settings, onAdd, onUpdateSettings }: Bra
                     type="number"
                     min={1}
                     max={24}
-                    value={settings.tireReminderMonths}
-                    onChange={(e) => onUpdateSettings({ tireReminderMonths: parseInt(e.target.value) || 6 })}
+                    required
+                    value={tireMonths}
+                    onChange={(e) => setTireMonths(e.target.value)}
                   />
                 </div>
+                {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+                <Button type="submit" variant="gold" className="w-full" disabled={saving}>{saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}</Button>
+                </fieldset>
+                </form>
               </TabsContent>
             </Tabs>
           </DialogContent>

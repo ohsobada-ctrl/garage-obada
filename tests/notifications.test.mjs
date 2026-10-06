@@ -21,6 +21,9 @@ test('notification migration: RLS, broadcast fanout, idempotency, reminders and 
     await db.exec(await readFile(new URL('../supabase/migrations/20261001010000_repair_notification_setup.sql', import.meta.url), 'utf8'));
     // Recovery from a partial installation must also be safe to run again.
     await db.exec(await readFile(new URL('../supabase/migrations/20261001010000_repair_notification_setup.sql', import.meta.url), 'utf8'));
+    const reliabilitySql = await readFile(new URL('../supabase/migrations/20261006000000_notification_reliability.sql', import.meta.url), 'utf8');
+    await db.exec(reliabilitySql);
+    await db.exec(reliabilitySql);
     await db.exec(`select set_config('request.jwt.claim.sub','${admin}',false);`);
     assert.equal((await db.query('select public.is_garage_admin() as ok')).rows[0].ok, true);
     await db.exec(`insert into push_devices(id,user_id,platform,token) values
@@ -59,6 +62,25 @@ test('notification migration: RLS, broadcast fanout, idempotency, reminders and 
     assert.ok(count >= 7, `Expected existing maintenance and custom alerts, got ${count}`);
     await db.exec('select enqueue_due_reminders()');
     assert.equal((await db.query('select count(*)::int as n from notification_inbox')).rows[0].n, count);
+
+    // Bad legacy JSON/date/settings data must not roll back a healthy reminder.
+    await db.exec(`insert into cars(user_id,make,model,year,legal_docs,oil_services,brake_tire_services,settings) values
+      ('${user}','Bad','Dates',2020,
+       '[{"id":"bad-date","expiryDate":"2026-02-31"},{"expiryDate":"2026-01-01"},null]'::jsonb,
+       '[{"id":"bad-oil","dateOfChange":"not a date"}]'::jsonb,
+       '[{"id":"bad-service","type":"brakes","lastChangeDate":"infinity"}]'::jsonb,
+       '{"oilExpiryMonths":"oops","brakeReminderMonths":"9999999999999999999999"}'::jsonb),
+      ('${user}','Bad','Arrays',2020,'{}'::jsonb,'null'::jsonb,'42'::jsonb,'[]'::jsonb);
+      update cars set settings=jsonb_build_object('brakeReminderMonths','invalid'),
+        brake_tire_services=jsonb_build_array(jsonb_build_object('id','fallback-brake','type','brakes','lastChangeDate',(current_date-interval '6 months')::date::text)) where id='${car}';
+      insert into maintenance_reminders(user_id,car_id,name,part_year,remind_at)
+        values('${user}','${car}','Healthy reminder',2026,now()-interval '1 minute');
+      select enqueue_due_reminders();`);
+    assert.equal((await db.query(`select count(*)::int as n from notification_inbox where title='تذكير تغيير Healthy reminder'`)).rows[0].n, 1);
+    assert.equal((await db.query(`select count(*)::int as n from notification_inbox where source_key like '%fallback-brake'`)).rows[0].n, 1);
+    const afterBadData = (await db.query('select count(*)::int as n from notification_inbox')).rows[0].n;
+    await db.exec('select enqueue_due_reminders()');
+    assert.equal((await db.query('select count(*)::int as n from notification_inbox')).rows[0].n, afterBadData);
   } finally { await db.close(); }
 });
 

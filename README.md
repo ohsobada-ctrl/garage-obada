@@ -1,73 +1,61 @@
-# Welcome to your Lovable project
+# كراج — Garage
 
-## Project info
+تطبيق لإدارة السيارات والصيانة والوثائق والتذكيرات، بواجهة عربية. يعمل كتطبيق
+ويب قابل للتثبيت، ويمكن بناء نسخ Android وiOS باستخدام Capacitor.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## التشغيل المحلي
 
-## How can I edit this code?
+يتطلب Node.js 22 أو أحدث وnpm. أنشئ `.env.local` بهذه الإعدادات العامة:
 
-There are several ways of editing your application.
+```dotenv
+VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_KEY
+VITE_WEB_PUSH_PUBLIC_KEY=YOUR_VAPID_PUBLIC_KEY
+```
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+يمكن استخدام `VITE_SUPABASE_ANON_KEY` بدلاً من publishable key. يجب أن يكون
+العنوان والمفتاح للمشروع نفسه. لا تضع service_role أو مفاتيح Push الخاصة في الواجهة.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm ci
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## الفحص قبل النشر
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+npm test
+npm run typecheck
+npm run lint
+npm run build
+npm run check:release
+```
 
-**Use GitHub Codespaces**
+فحص الإصدار للقراءة فقط: يتحقق من الاتصال والجداول والدالة الإدارية ومفتاح
+Web Push ووجود خدمة الإرسال. لا يثبت وصول الإشعار فعلياً؛ يلزم اختبار على أجهزة
+حقيقية بعد ضبط أسرار الخادم والمجدول.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## النشر
 
-## What technologies are used for this project?
+الواجهة React/Vite ويمكن نشرها مباشرة على Vercel بإعدادات `vercel.json`.
+لا تحتاج Lovable لتشغيل المشروع أو تطويره. تبقى Supabase مسؤولة عن البيانات
+وتسجيل الدخول والتذكيرات وإرسال الإشعارات في الخلفية.
 
-This project is built with:
+```sh
+npx supabase login
+npm run setup:database
+npm run setup:push
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+تتطلب أوامر الإعداد حساباً مخولاً وأسرار النشر، وتتوقف عند عدم توفرها. يحدّث
+workflow الخاص بالخلفية قاعدة البيانات وخدمة الإرسال تلقائياً بعد إعداد بيئة
+GitHub المسماة `production`. لا ترسل مفاتيح خاصة في المحادثات أو المستودع.
 
-## How can I deploy this project?
+تفاصيل إعداد iPhone وAndroid، المتغيرات المطلوبة، اختبار «تذكرني» والتوقيع:
+[دليل الإشعارات والنشر](NOTIFICATIONS_SETUP.md).
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## حدود جاهزية الإصدار
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+آخر فحص بتاريخ 6 أكتوبر 2026 أكد وجود خدمات البيانات المطلوبة، لكنه وجد أن
+خدمة Push غير منشورة وأن مفتاح Web Push غير مضبوط في البناء المحلي. يلزم إكمال
+تفعيل الخادم والتوقيع والتحقق على أجهزة حقيقية قبل إطلاق التطبيق للجمهور.

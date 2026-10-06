@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Car } from 'lucide-react';
-import { NotificationService } from '@/services/notificationService';
+import { useSaveAction } from '@/hooks/useSaveAction';
 
 interface AddCarDialogProps {
-  onAdd: (car: { make: string; model: string; year: number; currentMileage: number }) => void;
+  onAdd: (car: { make: string; model: string; year: number; currentMileage: number }) => Promise<unknown>;
   children?: React.ReactNode;
 }
 
@@ -17,22 +17,18 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
   const [model, setModel] = useState('');
   const [year, setYear] = useState<string>("");
   const [mileage, setMileage] = useState<string>("");
+  const { saving, saveError, save } = useSaveAction();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!make.trim() || !model.trim()) return;
-    
-
-    
-    onAdd({
+    const saved = await save(() => onAdd({
       make: make.trim(),
       model: model.trim(),
       year: Number(year),
       currentMileage: Number(mileage),
-    });
-
-
-    
+    }));
+    if (!saved) return;
     setMake('');
     setModel('');
     setYear('');
@@ -41,7 +37,7 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={value => { if (!saving) setOpen(value); }}>
       <DialogTrigger asChild>
         {children ? children : (
           <Button variant="gold" size="lg" className="gap-3">
@@ -58,6 +54,7 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 mt-4 font-tajawal">
+          <fieldset disabled={saving} className="contents">
           <div className="space-y-2 text-right">
             <Label htmlFor="make">الشركة المصنعة</Label>
             <Input
@@ -86,7 +83,7 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
                 <Input
                   id="year"
                   type="number"
-                  min={1990}
+                  min={1886}
                   max={new Date().getFullYear() + 1}
                   placeholder="2025" 
                   value={year}
@@ -109,9 +106,11 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
                 />
               </div>
           </div>
-          <Button type="submit" variant="gold" className="w-full font-bold" size="lg">
-            أضف السيارة
+          {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+          <Button type="submit" variant="gold" className="w-full font-bold" size="lg" disabled={saving}>
+            {saving ? 'جاري الحفظ...' : 'أضف السيارة'}
           </Button>
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

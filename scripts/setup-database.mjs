@@ -23,13 +23,20 @@ function run(args) {
 
 // Replay only the tested, idempotent repair. Historical migrations include unrelated
 // changes and must not be guessed as applied on an existing production database.
-const migration = readFileSync(join(root, 'supabase/migrations/20261001010000_repair_notification_setup.sql'), 'utf8');
+const migrationFiles = [
+  '20261001010000_repair_notification_setup.sql',
+  '20261006000000_notification_reliability.sql',
+];
+const migration = migrationFiles.map(name => readFileSync(join(root, 'supabase/migrations', name), 'utf8')).join('\n');
 const verify = `
 do $$ begin
   if to_regclass('public.notification_inbox') is null
      or to_regclass('public.maintenance_reminders') is null
      or to_regclass('public.push_devices') is null
      or to_regprocedure('public.garage_admin_report()') is null
+     or to_regprocedure('public.enqueue_due_reminders()') is null
+     or to_regprocedure('public.garage_reminder_date(text)') is null
+     or to_regprocedure('public.garage_reminder_months(text)') is null
      or to_regprocedure('public.send_garage_broadcast(uuid,text,text,text)') is null then
     raise exception 'Incomplete notification schema';
   end if;
@@ -42,7 +49,7 @@ try {
   // Link and query use the official CLI's stored login or SUPABASE_ACCESS_TOKEN.
   run(['link', '--project-ref', projectRef, '--yes']);
   if (dryRun) {
-    console.log('Apply the notification repair and verify it within one transaction. No database writes performed.');
+    console.log(`Apply ${migrationFiles.join(', ')} and verify within one transaction. No database writes performed.`);
   } else {
     taskDir = mkdtempSync(join(tmpdir(), 'garage-db-'));
     const sqlFile = resolve(taskDir, 'repair.sql');

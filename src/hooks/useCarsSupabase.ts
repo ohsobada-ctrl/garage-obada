@@ -2,9 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Car, CarSettings, LegalDocument, OilService, BrakeTireService, defaultCarSettings } from "@/types/car";
-import type { Database, Json } from '@/integrations/supabase/types';
 import { toast } from "sonner";
-import { backendError, shouldRetryBackend } from '@/lib/backendError';
+import { shouldRetryBackend } from '@/lib/backendError';
+import { carFromRow, updateOwnedCar } from '@/lib/carData';
 
 export function useCarsSupabase() {
   const { user } = useAuth();
@@ -24,19 +24,7 @@ export function useCarsSupabase() {
       if (error) throw error;
 
       // Transform DB records to local Car type
-      return data.map((record: Database['public']['Tables']['cars']['Row']) => ({
-        id: record.id,
-        make: record.make,
-        model: record.model,
-        year: record.year,
-        currentMileage: record.current_mileage,
-        lastMileageUpdate: record.last_mileage_update,
-        settings: record.settings || { ...defaultCarSettings },
-        legalDocs: record.legal_docs || [],
-        oilServices: record.oil_services || [],
-        brakeTireServices: record.brake_tire_services || [],
-        mileageHistory: record.mileage_history || [],
-      })) as unknown as Car[];
+      return data.map(carFromRow);
     },
     enabled: !!user,
     retry: shouldRetryBackend,
@@ -45,7 +33,10 @@ export function useCarsSupabase() {
   // 2. Add Car
   const addCarMutation = useMutation({
     mutationFn: async (car: Omit<Car, "id" | "legalDocs" | "oilServices" | "brakeTireServices" | "settings" | "lastMileageUpdate" | "mileageHistory">) => {
-      if (!user) throw new Error("User not authenticated");
+      if (!user) throw new Error('سجّل الدخول لحفظ سيارتك.');
+      if (!car.make.trim() || !car.model.trim() || !Number.isInteger(car.year) || car.year < 1886 || car.year > new Date().getFullYear() + 1 || !Number.isSafeInteger(car.currentMileage) || car.currentMileage < 0) {
+        throw new Error('راجع اسم السيارة وسنة الصنع والعداد.');
+      }
       
       const now = new Date().toISOString();
       const newCarData = {
@@ -69,116 +60,108 @@ export function useCarsSupabase() {
         .single();
 
       if (error) throw error;
-      return data;
+      return carFromRow(data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cars"] });
+    onSuccess: async (car) => {
+      queryClient.setQueryData<Car[]>(['cars', user?.uid], old => [car, ...(old || []).filter(item => item.id !== car.id)]);
+      await queryClient.invalidateQueries({ queryKey: ["cars", user?.uid] });
       toast.success("تمت إضافة السيارة بنجاح");
-    },
-    onError: (error: Error) => {
-      toast.error("خطأ في إضافة السيارة: " + error.message);
     },
   });
 
   // 3. Update Car
   const updateCarMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Car> }) => {
-      // Transform local updates to DB fields
-      const dbUpdates: Database['public']['Tables']['cars']['Update'] = {};
-      if (updates.make) dbUpdates.make = updates.make;
-      if (updates.model) dbUpdates.model = updates.model;
-      if (updates.year) dbUpdates.year = updates.year;
-      if (updates.currentMileage !== undefined) dbUpdates.current_mileage = updates.currentMileage;
-      if (updates.lastMileageUpdate) dbUpdates.last_mileage_update = updates.lastMileageUpdate;
-      if (updates.settings) dbUpdates.settings = updates.settings as unknown as Json;
-      if (updates.legalDocs) dbUpdates.legal_docs = updates.legalDocs as unknown as Json;
-      if (updates.oilServices) dbUpdates.oil_services = updates.oilServices as unknown as Json;
-      if (updates.brakeTireServices) dbUpdates.brake_tire_services = updates.brakeTireServices as unknown as Json;
-      if (updates.mileageHistory) dbUpdates.mileage_history = updates.mileageHistory as unknown as Json;
-
-      const { error } = await supabase
-        .from("cars")
-        .update(dbUpdates)
-        .eq("id", id);
-
-      if (error) throw error;
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Car> | ((car: Car) => Partial<Car>) }) => {
+      if (!user) throw new Error('سجّل الدخول لحفظ التعديل.');
+      return updateOwnedCar(supabase, user.uid, id, updates);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cars"] });
+    onSuccess: async (car) => {
+      queryClient.setQueryData<Car[]>(['cars', user?.uid], old => old?.map(item => item.id === car.id ? car : item));
+      await queryClient.invalidateQueries({ queryKey: ["cars", user?.uid] });
     },
-    onError: error => toast.error(backendError(error, 'تعذر حفظ التغيير')),
   });
 
   // 4. Delete Car
   const deleteCarMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      if (!user) throw new Error('سجّل الدخول لحذف السيارة.');
+      const { data, error } = await supabase
         .from("cars")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq('user_id', user.uid)
+        .select('id')
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error('لم يتم حذف السيارة. حدّث القائمة وتأكد من الحساب المستخدم.');
+      return id;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cars"] });
+    onSuccess: async (id) => {
+      queryClient.setQueryData<Car[]>(['cars', user?.uid], old => old?.filter(item => item.id !== id));
+      await queryClient.invalidateQueries({ queryKey: ["cars", user?.uid] });
       toast.success("تم حذف السيارة");
     },
-    onError: error => toast.error(backendError(error, 'تعذر حذف السيارة')),
   });
 
   // Helper Wrappers
   const addLegalDoc = (carId: string, doc: Omit<LegalDocument, 'id'>) => {
-    const car = cars.find(c => c.id === carId);
-    if (!car) return;
-    const filtered = car.legalDocs.filter(d => d.type !== doc.type);
-    updateCarMutation.mutate({ 
+    const id = crypto.randomUUID();
+    return updateCarMutation.mutateAsync({
       id: carId, 
-      updates: { legalDocs: [...filtered, { ...doc, id: crypto.randomUUID() }] } 
+      updates: car => ({ legalDocs: [...car.legalDocs.filter(d => d.type !== doc.type), { ...doc, id }] }),
     });
   };
 
   const addOilService = (carId: string, service: Omit<OilService, 'id'>) => {
-    const car = cars.find(c => c.id === carId);
-    if (!car) return;
-    updateCarMutation.mutate({ 
+    const id = crypto.randomUUID();
+    return updateCarMutation.mutateAsync({
       id: carId, 
-      updates: { 
-        oilServices: [...car.oilServices, { ...service, id: crypto.randomUUID() }],
-        currentMileage: Math.max(car.currentMileage, service.mileageAtChange),
-        lastMileageUpdate: new Date().toISOString(),
-      } 
+      updates: car => {
+        if (!Number.isSafeInteger(service.mileageAtChange) || service.mileageAtChange < 0) throw new Error('أدخل قراءة عداد صحيحة.');
+        const now = new Date().toISOString();
+        return {
+          oilServices: [...car.oilServices, { ...service, id }].sort((a, b) => a.dateOfChange.localeCompare(b.dateOfChange)),
+          ...(service.mileageAtChange > car.currentMileage ? {
+            currentMileage: service.mileageAtChange,
+            lastMileageUpdate: now,
+            mileageHistory: [...car.mileageHistory, { id, mileage: service.mileageAtChange, date: now }],
+          } : {}),
+        };
+      },
     });
   };
 
   const addBrakeTireService = (carId: string, service: Omit<BrakeTireService, 'id'>) => {
-    const car = cars.find(c => c.id === carId);
-    if (!car) return;
-    const filtered = car.brakeTireServices.filter(s => s.type !== service.type);
-    updateCarMutation.mutate({ 
+    const id = crypto.randomUUID();
+    return updateCarMutation.mutateAsync({
       id: carId, 
-      updates: { brakeTireServices: [...filtered, { ...service, id: crypto.randomUUID() }] } 
+      updates: car => ({ brakeTireServices: [...car.brakeTireServices.filter(s => s.type !== service.type), { ...service, id }] }),
     });
   };
 
   const updateMileage = (carId: string, mileage: number) => {
-    const car = cars.find(c => c.id === carId);
-    if (!car) return;
     const now = new Date().toISOString();
-    updateCarMutation.mutate({ 
+    const id = crypto.randomUUID();
+    return updateCarMutation.mutateAsync({
       id: carId, 
-      updates: { 
+      updates: car => {
+        if (!Number.isSafeInteger(mileage) || mileage < 0) throw new Error('أدخل قراءة عداد صحيحة.');
+        return {
         currentMileage: mileage, 
         lastMileageUpdate: now,
-        mileageHistory: [...(car.mileageHistory || []), { id: crypto.randomUUID(), mileage, date: now }] 
-      } 
+        mileageHistory: [...car.mileageHistory, { id, mileage, date: now }],
+        };
+      },
     });
   };
 
   const updateCarSettings = (carId: string, settings: Partial<CarSettings>) => {
-    const car = cars.find(c => c.id === carId);
-    if (!car) return;
-    updateCarMutation.mutate({ 
+    return updateCarMutation.mutateAsync({
       id: carId, 
-      updates: { settings: { ...car.settings, ...settings } } 
+      updates: car => {
+        if (Object.values(settings).some(value => !Number.isSafeInteger(value) || value <= 0)) throw new Error('أدخل فترة ومسافة تذكير صحيحتين.');
+        return { settings: { ...car.settings, ...settings } };
+      },
     });
   };
 
@@ -189,9 +172,9 @@ export function useCarsSupabase() {
     loadError,
     refetch,
     isFetching,
-    addCar: addCarMutation.mutate,
-    updateCar: updateCarMutation.mutate,
-    deleteCar: deleteCarMutation.mutate,
+    addCar: addCarMutation.mutateAsync,
+    updateCar: updateCarMutation.mutateAsync,
+    deleteCar: deleteCarMutation.mutateAsync,
     addLegalDoc,
     addOilService,
     addBrakeTireService,

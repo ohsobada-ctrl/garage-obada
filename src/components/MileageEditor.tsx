@@ -5,26 +5,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MileageRecord } from '@/types/car';
+import { useSaveAction } from '@/hooks/useSaveAction';
 
 interface MileageEditorProps {
   currentMileage: number;
   mileageHistory: MileageRecord[];
-  onUpdate: (mileage: number) => void;
+  onUpdate: (mileage: number) => Promise<unknown>;
 }
 
 export function MileageEditor({ currentMileage, mileageHistory = [], onUpdate }: MileageEditorProps) {
   const [open, setOpen] = useState(false);
   const [mileage, setMileage] = useState(currentMileage);
+  const { saving, saveError, save } = useSaveAction();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mileage > 0) {
-      onUpdate(mileage);
+    if (Number.isSafeInteger(mileage) && mileage >= 0 && await save(() => onUpdate(mileage))) {
       setOpen(false);
     }
   };
 
   const handleOpenChange = (isOpen: boolean) => {
+    if (saving) return;
     if (isOpen) {
       setMileage(currentMileage);
     }
@@ -50,20 +52,23 @@ export function MileageEditor({ currentMileage, mileageHistory = [], onUpdate }:
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset disabled={saving} className="contents">
           <div className="space-y-2">
             <Label>العداد الحالي (كم)</Label>
             <Input
               type="number"
               min={0}
-              value={mileage}
-              onChange={(e) => setMileage(parseInt(e.target.value) || 0)}
+              value={Number.isNaN(mileage) ? '' : mileage}
+              onChange={(e) => setMileage(e.target.valueAsNumber)}
               className="text-center text-xl font-bold"
               required
             />
           </div>
-          <Button type="submit" variant="gold" className="w-full">
-            حفظ التعديل
+          {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+          <Button type="submit" variant="gold" className="w-full" disabled={saving}>
+            {saving ? 'جاري الحفظ...' : 'حفظ التعديل'}
           </Button>
+          </fieldset>
         </form>
 
         {sortedHistory.length > 0 && (

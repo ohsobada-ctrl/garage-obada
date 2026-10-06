@@ -8,16 +8,25 @@ function deviceId() {
   if (!id) { id = crypto.randomUUID(); localStorage.setItem('garage_device_id', id); }
   return id;
 }
-async function saveDevice(values: { platform: string; token?: string; subscription?: PushSubscriptionJSON }) {
+let registrationVersion = 0;
+const pendingEnables = new Set<Promise<void>>();
+let disabling: Promise<void> | null = null;
+function assertRegistrationCurrent(version: number) {
+  if (version !== registrationVersion) throw new Error('تم إيقاف تفعيل الإشعارات');
+}
+async function saveDevice(values: { platform: string; token?: string; subscription?: PushSubscriptionJSON }, version: number) {
+  assertRegistrationCurrent(version);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('سجّل دخولك أولاً');
+  assertRegistrationCurrent(version);
   const { error } = await supabase.from('push_devices').upsert({ id: deviceId(), user_id: user.id, ...values, enabled: true, updated_at: new Date().toISOString() });
   if (error) throw error;
+  assertRegistrationCurrent(version);
   localStorage.setItem('garage_push_enabled', 'true');
   window.dispatchEvent(new Event('garage_push_changed'));
 }
 let registration: Promise<void> | null = null;
-async function registerNative() {
+async function registerNative(version: number) {
   if (registration) return registration;
   registration = (async () => {
     let resolveToken: (token: string) => void;
@@ -31,7 +40,7 @@ async function registerNative() {
     try {
       await PushNotifications.register();
       const token = await tokenPromise;
-      await saveDevice({ platform: Capacitor.getPlatform(), token });
+      await saveDevice({ platform: Capacitor.getPlatform(), token }, version);
     } finally { clearTimeout(timer); await success.remove(); await failure.remove(); }
   })().finally(() => { registration = null; });
   return registration;
@@ -73,12 +82,16 @@ export const NotificationService = {
   async createChannel() {
     if (Capacitor.getPlatform() === 'android') await PushNotifications.createChannel({ id: 'garage-push', name: 'إشعارات كراج', importance: 5, visibility: 1, vibration: true, sound: 'default' });
   },
-  async enable(prompt = true) {
+  enable(prompt = true) {
+    if (disabling) return Promise.reject(new Error('انتظر اكتمال إيقاف الإشعارات ثم أعد المحاولة'));
+    const version = registrationVersion;
+    const work = (async () => {
     if (Capacitor.isNativePlatform()) {
       const permission = prompt ? await PushNotifications.requestPermissions() : await PushNotifications.checkPermissions();
       if (permission.receive !== 'granted') throw new Error('اسمح بالإشعارات من إعدادات الجهاز');
+      assertRegistrationCurrent(version);
       await NotificationService.createChannel();
-      await registerNative();
+      await registerNative(version);
     } else {
       const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
@@ -89,6 +102,7 @@ export const NotificationService = {
       if (!key) throw new Error('خدمة إشعارات الجهاز قيد التجهيز. رسائلك متاحة داخل مركز التنبيهات');
       const permission = prompt ? await Notification.requestPermission() : Notification.permission;
       if (permission !== 'granted') throw new Error('اسمح بالإشعارات من إعدادات الجهاز أو المتصفح، ثم أعد المحاولة');
+      assertRegistrationCurrent(version);
       const reg = await NotificationService.registerServiceWorker();
       let subscription = await reg.pushManager.getSubscription();
       const normalized = key.replace(/-/g, '+').replace(/_/g, '/');
@@ -101,15 +115,26 @@ export const NotificationService = {
       if (!subscription) {
         subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes });
       }
-      await saveDevice({ platform: 'web', subscription: subscription.toJSON() });
+      await saveDevice({ platform: 'web', subscription: subscription.toJSON() }, version);
     }
     // Retire legacy schedules after the device is registered; all reminders now use one server queue.
     if (Capacitor.isNativePlatform()) {
-      const pending = await LocalNotifications.getPending();
-      if (pending.notifications.length) await LocalNotifications.cancel(pending);
+      try {
+        const pending = await LocalNotifications.getPending();
+        if (pending.notifications.length) await LocalNotifications.cancel(pending);
+      } catch { /* Legacy local permissions do not determine Push registration. */ }
     }
+    })();
+    pendingEnables.add(work);
+    return work.finally(() => { pendingEnables.delete(work); });
   },
-  async disable() {
+  disable() {
+    if (disabling) return disabling;
+    registrationVersion++;
+    disabling = (async () => {
+    // An automatic renewal may be waiting on the network when logout starts.
+    // Drain it before deleting the server row so it cannot reattach afterwards.
+    await Promise.allSettled([...pendingEnables]);
     const id = localStorage.getItem('garage_device_id');
     if (id) {
       const { error } = await supabase.from('push_devices').delete().eq('id', id);
@@ -132,6 +157,8 @@ export const NotificationService = {
     localStorage.setItem('garage_push_enabled', 'false');
     localStorage.removeItem('garage_device_id');
     window.dispatchEvent(new Event('garage_push_changed'));
+    })().finally(() => { disabling = null; });
+    return disabling;
   },
   async requestPermissions() {
     await NotificationService.enable();

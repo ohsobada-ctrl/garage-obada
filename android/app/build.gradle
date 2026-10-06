@@ -18,22 +18,17 @@ android {
     }
     signingConfigs {
         release {
-            def keystorePath = System.getenv("KEYSTORE_FILE") ?: "release.keystore"
-            def keystoreFile = file(keystorePath)
-            if (!keystoreFile.exists()) {
-                keystoreFile = file("release.keystore")
-            }
+            def keystorePath = System.getenv("KEYSTORE_FILE")
+            def keystoreFile = keystorePath ? file(keystorePath) : null
             def ksPass = System.getenv("KEYSTORE_PASSWORD")
             def kAlias = System.getenv("KEY_ALIAS")
             def kPass = System.getenv("KEY_PASSWORD")
 
-            if (keystoreFile.exists() && ksPass && kAlias && kPass) {
+            if (keystoreFile?.exists() && ksPass && kAlias && kPass) {
                 storeFile keystoreFile
                 storePassword ksPass
                 keyAlias kAlias
                 keyPassword kPass
-            } else {
-                throw new GradleException("CRITICAL ERROR: Release keystore file or environment secrets (KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) are missing. Cannot build release APK without valid release signing credentials.")
             }
         }
     }
@@ -43,6 +38,17 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+// Debug builds and IDE sync must not require production signing credentials.
+// Release packaging must never silently fall back to a checked-in/default key.
+gradle.taskGraph.whenReady { graph ->
+    def packagesRelease = graph.allTasks.any {
+        it.project == project && it.name in ['assembleRelease', 'bundleRelease', 'packageRelease', 'signReleaseBundle']
+    }
+    if (packagesRelease && !android.signingConfigs.release.storeFile) {
+        throw new GradleException("Set KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD before packaging a release.")
     }
 }
 

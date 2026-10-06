@@ -79,18 +79,19 @@ export default function Auth() {
       const cleanEmail = email.toLowerCase().trim();
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password,
       });
 
       if (error) {
         if (error.message.includes("Email not confirmed")) {
-          toast.warning("البريد الإلكتروني لم يتم تأكيده بعد. سنرسل لك رمز تحقق جديد.");
-          await supabase.auth.resend({
+          const { error: resendError } = await supabase.auth.resend({
             type: "signup",
             email: cleanEmail,
           });
+          if (resendError) throw resendError;
+          toast.info('أرسلنا رسالة تأكيد جديدة إلى بريدك. افتح الرابط أو أدخل الرمز الموجود فيها.');
           setMode("verify_signup");
           return;
         }
@@ -162,7 +163,7 @@ export default function Auth() {
         toast.success("تم إنشاء الحساب وتسجيل الدخول بنجاح!");
         navigate(nextPath, { replace: true });
       } else {
-        toast.success("تم إنشاء الحساب بنجاح! يرجى إدخال رمز التحقق المكون من 6 أرقام المرسل إلى بريدك الإلكتروني.");
+        toast.success('راجع بريدك لإكمال التسجيل عبر رابط التأكيد أو رمز التحقق الموجود في الرسالة.');
         setOtpToken("");
         setMode("verify_signup");
       }
@@ -186,7 +187,7 @@ export default function Auth() {
         redirectTo: `${window.location.origin}/auth`,
       });
       if (error) throw error;
-      toast.success("تم إرسال رمز استعادة كلمة المرور إلى بريدك الإلكتروني");
+      toast.success('راجع بريدك لاستعادة كلمة المرور عبر الرابط أو الرمز الموجود في الرسالة.');
       setOtpToken("");
       setMode("verify_recovery");
     } catch (error) {
@@ -206,7 +207,7 @@ export default function Auth() {
     setLoading(true);
     try {
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
         token: otpToken,
         type: "signup",
@@ -234,7 +235,7 @@ export default function Auth() {
     setLoading(true);
     try {
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
         token: otpToken,
         type: "recovery",
@@ -310,8 +311,8 @@ export default function Auth() {
           {mode === "login" && "مرحباً بك في Garage، يرجى تسجيل الدخول لمتابعة"}
           {mode === "signup" && "يرجى إدخال بياناتك لإنشاء حساب جديد"}
           {mode === "forgot" && "أدخل بريدك الإلكتروني لإرسال رمز الاستعادة"}
-          {mode === "verify_signup" && "أدخل الرمز المكون من 6 أرقام لتأكيد حسابك"}
-          {mode === "verify_recovery" && "أدخل رمز الاستعادة المكون من 6 أرقام"}
+          {mode === "verify_signup" && "افتح رابط التأكيد في بريدك، أو أدخل الرمز إن وُجد"}
+          {mode === "verify_recovery" && "افتح رابط الاستعادة في بريدك، أو أدخل الرمز إن وُجد"}
           {mode === "reset_password" && "أدخل كلمة المرور الجديدة لتحديث حسابك"}
         </p>
       </div>
@@ -402,7 +403,7 @@ export default function Auth() {
             <>
               <div className="text-center mb-4">
                 <p className="text-sm text-gray-400">
-                  لقد أرسلنا رمز التحقق إلى بريدك الإلكتروني: <br />
+                  راجع رسالة التأكيد المرسلة إلى: <br />
                   <span className="text-white font-bold">{email}</span>
                 </p>
               </div>
@@ -410,6 +411,8 @@ export default function Auth() {
                 <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
                 <Input 
                   type="text" 
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={8}
                   placeholder="رمز التحقق" 
                   value={otpToken} 
@@ -430,7 +433,7 @@ export default function Auth() {
             <>
               <div className="text-center mb-4">
                 <p className="text-sm text-gray-400">
-                  لقد أرسلنا رمز استعادة الحساب إلى بريدك الإلكتروني: <br />
+                  راجع رسالة استعادة الحساب المرسلة إلى: <br />
                   <span className="text-white font-bold">{email}</span>
                 </p>
               </div>
@@ -438,6 +441,8 @@ export default function Auth() {
                 <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
                 <Input 
                   type="text" 
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={8}
                   placeholder="رمز الاستعادة" 
                   value={otpToken} 
