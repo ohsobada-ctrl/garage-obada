@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -147,6 +147,20 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+      - name: Prepare Direct APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk ./garage.apk
+
+      - name: Publish Direct APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: v1.0.1
+          name: "Garage App v1.0.1 (APK)"
+          body: "Direct APK download for Android. Download garage.apk directly below to install."
+          files: ./garage.apk
+          prerelease: false
+          make_latest: true
 
       - name: Remove temporary signing key
         if: always()
