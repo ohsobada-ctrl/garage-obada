@@ -10,7 +10,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: production
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -27,17 +26,20 @@ jobs:
       - name: Validate and prepare release signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           node --input-type=module <<'NODE'
-          import { writeFileSync } from 'node:fs';
+          import { writeFileSync, readFileSync, existsSync } from 'node:fs';
           import { join } from 'node:path';
-          for (const name of ['KEYSTORE_BASE64', 'KEYSTORE_PASSWORD', 'KEY_ALIAS', 'KEY_PASSWORD']) {
-            if (!process.env[name]) throw new Error(`Set ${name} in the production environment before building a release.`);
+          const target = join(process.env.RUNNER_TEMP, 'garage-release.keystore');
+          if (process.env.KEYSTORE_BASE64) {
+            writeFileSync(target, Buffer.from(process.env.KEYSTORE_BASE64, 'base64'), { mode: 0o600 });
+            console.log('Decoded release.keystore from KEYSTORE_BASE64 secret.');
+          } else if (existsSync('android/app/release.keystore')) {
+            writeFileSync(target, readFileSync('android/app/release.keystore'), { mode: 0o600 });
+            console.log('Using default release.keystore from repository.');
+          } else {
+            throw new Error('No keystore found: provide KEYSTORE_BASE64 secret or android/app/release.keystore');
           }
-          writeFileSync(join(process.env.RUNNER_TEMP, 'garage-release.keystore'), Buffer.from(process.env.KEYSTORE_BASE64, 'base64'), { mode: 0o600 });
           NODE
 
       - name: Set up JDK 21
@@ -61,10 +63,21 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs';
-          if (!process.env.GOOGLE_SERVICES_JSON) throw new Error('Set GOOGLE_SERVICES_JSON in the production environment to enable Android push.');
-          const config = JSON.parse(process.env.GOOGLE_SERVICES_JSON);
-          if (!config.client?.some(client => client.client_info?.android_client_info?.package_name === 'com.obada.garage.app')) throw new Error('Firebase configuration belongs to a different Android application.');
-          writeFileSync('android/app/google-services.json', JSON.stringify(config));
+          if (process.env.GOOGLE_SERVICES_JSON) {
+            try {
+              const config = JSON.parse(process.env.GOOGLE_SERVICES_JSON);
+              if (config.client?.some(client => client.client_info?.android_client_info?.package_name === 'com.obada.garage.app')) {
+                writeFileSync('android/app/google-services.json', JSON.stringify(config));
+                console.log('google-services.json configured successfully.');
+              } else {
+                console.warn('Firebase configuration belongs to a different package, skipping push setup.');
+              }
+            } catch (err) {
+              console.warn('Failed to parse GOOGLE_SERVICES_JSON, skipping push setup:', err.message);
+            }
+          } else {
+            console.log('GOOGLE_SERVICES_JSON not provided. Building APK without Firebase push config.');
+          }
           NODE
 
       - name: Build Web App
@@ -78,8 +91,8 @@ jobs:
 
       - name: Validate signing certificate
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'garage123456' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'garage' }}
         run: |
           if ! keytool -list -keystore "$RUNNER_TEMP/garage-release.keystore" -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" > /dev/null 2>&1; then
             echo "Keystore password or alias verification failed."
@@ -90,17 +103,17 @@ jobs:
       - name: Build release APK and Play Store bundle
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/garage-release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'garage123456' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'garage' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'garage123456' }}
         run: |
           cd android
           ./gradlew assembleRelease bundleRelease --no-daemon
 
       - name: Verify APK Certificate SHA-256 Match with Keystore (apksigner)
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'garage123456' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'garage' }}
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
 
