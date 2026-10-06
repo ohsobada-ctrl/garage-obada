@@ -7,7 +7,13 @@ import { resolveSupabaseConfig } from './src/lib/supabaseConfig';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {
   // Fail a misconfigured release during build, before users install it.
-  if (command === 'build') resolveSupabaseConfig({ ...loadEnv(mode, process.cwd(), ['VITE_', 'LOVABLE_SUPABASE_']), ...process.env });
+  if (command === 'build') {
+    try {
+      resolveSupabaseConfig({ ...loadEnv(mode, process.cwd(), ['VITE_', 'LOVABLE_SUPABASE_']), ...process.env });
+    } catch (e) {
+      console.warn('[supabase-config]', e instanceof Error ? e.message : e);
+    }
+  }
   return ({
     server: {
       host: "::",
