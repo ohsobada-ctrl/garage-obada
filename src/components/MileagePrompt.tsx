@@ -82,7 +82,10 @@ export function MileagePrompt({ cars, open, onClose, onUpdate }: MileagePromptPr
               type="number"
               min={0}
               value={Number.isNaN(mileage) ? '' : mileage}
-              onChange={(e) => setMileage(e.target.valueAsNumber)}
+              onChange={(e) => {
+                const parsed = Number(e.target.value);
+                setMileage(Number.isNaN(parsed) ? e.target.valueAsNumber : parsed);
+              }}
               className="text-center text-xl font-bold"
               required
             />

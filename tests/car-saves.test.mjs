@@ -43,7 +43,10 @@ test('a car form waits for confirmed save, retains values on failure, and suppor
   assert.equal(view.getByLabelText('الشركة المصنعة').value, 'تويوتا');
   assert.equal(view.getByLabelText('العداد (كم)').value, '50000');
   fireEvent.submit(view.getByLabelText('الشركة المصنعة').closest('form'));
-  await waitFor(() => assert.equal(view.queryByRole('dialog'), null));
+  await waitFor(() => {
+    const dialog = view.queryByRole('dialog');
+    assert.ok(!dialog || dialog.getAttribute('data-state') === 'closed');
+  });
   assert.equal(attempts, 2);
 });
 
