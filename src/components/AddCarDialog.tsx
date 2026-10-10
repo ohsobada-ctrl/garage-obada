@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,6 +52,7 @@ export function AddCarDialog({ onAdd, children }: AddCarDialogProps) {
             <Car className="w-6 h-6 text-garage-gold" />
             سيارة جديدة
           </DialogTitle>
+          <DialogDescription>أدخل بيانات سيارتك لبدء متابعة الصيانة والتذكيرات.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 mt-4 font-tajawal">
           <fieldset disabled={saving} className="contents">

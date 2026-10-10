@@ -68,7 +68,7 @@ test('mileage prompt accepts cars loaded after mount and saves a valid zero read
 });
 
 function databaseClient(fetch) {
-  return createClient('https://garage.example', 'public-test-key', { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch } });
+  return createClient('https://garage.example', 'public-test-key', { auth: { storageKey: crypto.randomUUID(), persistSession: false, autoRefreshToken: false }, global: { fetch } });
 }
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 
@@ -103,4 +103,24 @@ test('missing rows and denied writes are reported as failures', async () => {
   await assert.rejects(updateOwnedCar(missing, 'owner-1', 'gone', { currentMileage: 20 }), /لم تعد متاحة/);
   const denied = databaseClient(async (_url, init) => init.method === 'GET' ? response([row]) : response({ code: '42501', message: 'permission denied' }, 403));
   await assert.rejects(updateOwnedCar(denied, 'owner-1', 'car-1', { currentMileage: 20 }), error => error.code === '42501');
+});
+
+test('malformed legacy records cannot crash the garage or be erased by a new save', async () => {
+  const damaged = { ...row, legal_docs: {}, oil_services: [null, { id: 'invalid', dateOfChange: 'wrong' }],
+    brake_tire_services: [false], mileage_history: [null], settings: { oilRangeKm: 'wrong', oilExpiryMonths: -2 } };
+  const snapshot = structuredClone(damaged);
+  const display = carFromRow(damaged);
+  assert.equal(display.hasIncompleteRecords, true);
+  assert.deepEqual(display.oilServices, []);
+  assert.deepEqual(display.legalDocs, []);
+  assert.equal(display.settings.oilRangeKm, 5000);
+  assert.equal(display.settings.oilExpiryMonths, 6);
+  assert.deepEqual(damaged, snapshot);
+  let writes = 0;
+  const client = databaseClient(async (_url, init) => {
+    if (init.method !== 'GET') writes++;
+    return response([damaged]);
+  });
+  await assert.rejects(updateOwnedCar(client, 'owner-1', 'car-1', { oilServices: [] }), /بياناتك الأصلية محفوظة/);
+  assert.equal(writes, 0);
 });

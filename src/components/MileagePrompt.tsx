@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Gauge } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,6 +48,7 @@ export function MileagePrompt({ cars, open, onClose, onUpdate }: MileagePromptPr
             <Gauge className="w-6 h-6 text-primary" />
             تحديث العداد
           </DialogTitle>
+          <DialogDescription>سجّل قراءة العداد الحالية لتحديث مواعيد صيانة سيارتك.</DialogDescription>
         </DialogHeader>
         <div className="text-center py-4">
           <p className="text-lg font-medium text-primary mb-2">

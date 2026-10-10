@@ -39,6 +39,7 @@ export interface Car {
   oilServices: OilService[];
   brakeTireServices: BrakeTireService[];
   settings: CarSettings;
+  hasIncompleteRecords?: boolean;
 }
 
 export interface CarSettings {

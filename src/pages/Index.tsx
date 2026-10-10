@@ -176,6 +176,7 @@ const Index = () => {
         </header>
 
         <main className="container pt-6 space-y-6">
+          {car.hasIncompleteRecords && <p role="status" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm">بعض سجلات الصيانة القديمة غير مكتملة وتحتاج مراجعة. بياناتها الأصلية محفوظة، ونعرض السجلات السليمة.</p>}
           <InboxStatus error={inbox.error} busy={inbox.isFetching} retry={() => void inbox.refetch()} />
           {/* Car Info Card */}
           <Card className="overflow-hidden">
@@ -303,6 +304,7 @@ const Index = () => {
       </header>
 
       <main className="container pt-6 pb-24">
+        {cars.some(car => car.hasIncompleteRecords) && <p role="status" className="mb-4 rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm">توجد سجلات صيانة قديمة غير مكتملة. افتح السيارة لمراجعتها؛ بياناتها الأصلية محفوظة.</p>}
         <InboxStatus error={inbox.error} busy={inbox.isFetching} retry={() => void inbox.refetch()} />
         {cars.length > 0 && (
           <>
